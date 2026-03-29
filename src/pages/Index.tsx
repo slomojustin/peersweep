@@ -30,8 +30,8 @@ const Index = () => {
         <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="container flex items-center justify-between h-14">
             <div className="flex items-center gap-3">
-              <Landmark className="h-5 w-5 text-primary" />
-              <span className="font-display text-lg">UBPR Intelligence</span>
+              <Landmark className="h-5 w-5 text-accent" />
+              <span className="font-display text-lg">Peer<span className="text-accent">Sweep</span></span>
             </div>
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground">
