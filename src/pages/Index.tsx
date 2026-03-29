@@ -9,7 +9,7 @@ import MarketResearch from "@/components/MarketResearch";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, Brain, Users, Landmark, Globe, ArrowRight } from "lucide-react";
-import peersweepLogo from "@/assets/peersweep-logo.png";
+
 
 const Index = () => {
   const [subjectBank, setSubjectBank] = useState<BankInfo[]>([]);
