@@ -1,16 +1,165 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import { type BankInfo, generateMockMetrics, generateNarrative } from "@/data/bankData";
+import BankSelector from "@/components/BankSelector";
+import UBPRReport from "@/components/UBPRReport";
+import AINarrativePanel from "@/components/AINarrativePanel";
+import PeerComparison from "@/components/PeerComparison";
+import DepositAnalysis from "@/components/DepositAnalysis";
+import MarketResearch from "@/components/MarketResearch";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart3, Brain, Users, Landmark, Globe, ArrowRight } from "lucide-react";
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const Index = () => {
+  const [subjectBank, setSubjectBank] = useState<BankInfo[]>([]);
+  const [peerBanks, setPeerBanks] = useState<BankInfo[]>([]);
+  const [showDashboard, setShowDashboard] = useState(false);
+
+  const selectedBank = subjectBank[0];
+  const metrics = selectedBank ? generateMockMetrics(selectedBank.rssd) : [];
+  const narratives = selectedBank ? generateNarrative(selectedBank, metrics) : [];
+
+  const handleAnalyze = () => {
+    if (selectedBank) setShowDashboard(true);
+  };
+
+  if (showDashboard && selectedBank) {
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Dashboard Header */}
+        <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
+          <div className="container flex items-center justify-between h-14">
+            <div className="flex items-center gap-3">
+              <Landmark className="h-5 w-5 text-primary" />
+              <span className="font-display text-lg">UBPR Intelligence</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground">
+                {selectedBank.name} | {selectedBank.rssd}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setShowDashboard(false)}>
+                Change Bank
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Dashboard Content */}
+        <main className="container py-6">
+          <Tabs defaultValue="ubpr" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-5 h-11">
+              <TabsTrigger value="ubpr" className="gap-2 text-xs">
+                <BarChart3 className="h-3.5 w-3.5" />
+                UBPR Report
+              </TabsTrigger>
+              <TabsTrigger value="insights" className="gap-2 text-xs">
+                <Brain className="h-3.5 w-3.5" />
+                AI Insights
+              </TabsTrigger>
+              <TabsTrigger value="peers" className="gap-2 text-xs">
+                <Users className="h-3.5 w-3.5" />
+                Peer Analysis
+              </TabsTrigger>
+              <TabsTrigger value="deposits" className="gap-2 text-xs">
+                <Landmark className="h-3.5 w-3.5" />
+                Deposits
+              </TabsTrigger>
+              <TabsTrigger value="market" className="gap-2 text-xs">
+                <Globe className="h-3.5 w-3.5" />
+                Market
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="ubpr">
+              <UBPRReport bankName={selectedBank.name} metrics={metrics} />
+            </TabsContent>
+
+            <TabsContent value="insights">
+              <AINarrativePanel narratives={narratives} bankName={selectedBank.name} />
+            </TabsContent>
+
+            <TabsContent value="peers">
+              <PeerComparison subjectBank={selectedBank} subjectMetrics={metrics} peerBanks={peerBanks} />
+            </TabsContent>
+
+            <TabsContent value="deposits">
+              <DepositAnalysis bankName={selectedBank.name} metrics={metrics} />
+            </TabsContent>
+
+            <TabsContent value="market">
+              <MarketResearch bankName={selectedBank.name} />
+            </TabsContent>
+          </Tabs>
+        </main>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Hero */}
+      <div className="flex-1 flex items-center justify-center">
+        <div className="container max-w-2xl py-16">
+          <div className="text-center mb-12 animate-fade-in">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Landmark className="h-8 w-8 text-primary" />
+            </div>
+            <h1 className="font-display text-4xl md:text-5xl text-foreground mb-3">
+              UBPR Intelligence
+            </h1>
+            <p className="text-muted-foreground text-lg max-w-md mx-auto">
+              AI-powered performance analytics for community banks. Regulator-aligned. Explainable. Fast.
+            </p>
+          </div>
+
+          <div className="space-y-6 animate-fade-in" style={{ animationDelay: "0.15s" }}>
+            <BankSelector
+              label="Subject Bank"
+              description="Select the bank to analyze"
+              selected={subjectBank}
+              onSelect={setSubjectBank}
+            />
+
+            <BankSelector
+              label="Peer Group"
+              description="Select up to 25 banks for comparison"
+              selected={peerBanks}
+              onSelect={setPeerBanks}
+              multiple
+              maxSelections={25}
+            />
+
+            <Button
+              className="w-full h-12 text-base gap-2"
+              onClick={handleAnalyze}
+              disabled={!selectedBank}
+            >
+              Analyze Performance
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="mt-12 grid grid-cols-4 gap-4 text-center animate-fade-in" style={{ animationDelay: "0.3s" }}>
+            {[
+              { icon: BarChart3, label: "FFIEC Reports" },
+              { icon: Brain, label: "AI Narratives" },
+              { icon: Users, label: "Peer Analysis" },
+              { icon: Globe, label: "Market Intel" },
+            ].map(({ icon: Icon, label }) => (
+              <div key={label} className="p-3 rounded-lg bg-muted/50">
+                <Icon className="h-5 w-5 mx-auto mb-1.5 text-primary/70" />
+                <p className="text-xs text-muted-foreground font-medium">{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <footer className="border-t py-4 text-center text-xs text-muted-foreground">
+        Data sourced from FFIEC CDR • AI-powered analysis • Not a substitute for regulatory examination
+      </footer>
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;
