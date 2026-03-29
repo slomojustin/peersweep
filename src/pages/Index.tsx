@@ -101,7 +101,7 @@ const Index = () => {
       {/* Hero */}
       <div className="flex-1 flex items-center justify-center">
         <div className="container max-w-2xl py-16">
-          <div className="flex items-center justify-center gap-2 mb-12 animate-fade-in">
+          <div className="flex items-center justify-center gap-2 mb-12 animate-fade-in w-fit mx-auto">
             <img src={peersweepLogo} alt="PeerSweep" className="h-60 w-60 object-contain -mr-8" />
             <div className="text-left">
               <h1 className="font-display text-4xl md:text-5xl text-foreground mb-1">
