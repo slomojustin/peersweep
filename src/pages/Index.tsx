@@ -101,11 +101,11 @@ const Index = () => {
       {/* Hero */}
       <div className="flex-1 flex items-center justify-center">
         <div className="container max-w-2xl py-16">
-          <div className="flex items-center justify-center gap-2 mb-12 animate-fade-in w-fit mx-auto">
-            <img src={peersweepLogo} alt="PeerSweep" className="h-60 w-60 object-contain -mr-8" />
+          <div className="flex items-start justify-center gap-2 mb-12 animate-fade-in w-fit mx-auto">
+            <img src={peersweepLogo} alt="PeerSweep" className="h-60 w-60 object-contain -mr-10" />
             <div className="text-left">
               <h1 className="font-brand text-4xl md:text-5xl text-foreground mb-1 tracking-tight">
-                Peer<span className="text-accent">Sweep</span>
+                <span className="text-primary">Peer</span><span className="text-accent">Sweep</span>
               </h1>
               <p className="text-accent font-semibold tracking-wide uppercase text-sm">
                 Actionable Market Intel — Fast.
