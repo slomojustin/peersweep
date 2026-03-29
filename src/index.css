@@ -7,24 +7,24 @@
 @layer base {
   :root {
     --background: 210 20% 98%;
-    --foreground: 215 25% 12%;
+    --foreground: 192 80% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 12%;
+    --card-foreground: 192 80% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 12%;
+    --popover-foreground: 192 80% 10%;
 
-    --primary: 215 50% 23%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 192 80% 20%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 25% 93%;
-    --secondary-foreground: 215 25% 12%;
+    --secondary: 190 25% 92%;
+    --secondary-foreground: 192 80% 10%;
 
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 15% 50%;
+    --muted: 190 20% 96%;
+    --muted-foreground: 192 15% 45%;
 
-    --accent: 165 80% 38%;
+    --accent: 24 95% 50%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
@@ -33,32 +33,32 @@
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
-    --success: 152 55% 40%;
+    --success: 172 65% 35%;
     --success-foreground: 0 0% 100%;
 
-    --border: 214 20% 88%;
-    --input: 214 20% 88%;
-    --ring: 215 50% 23%;
+    --border: 192 20% 88%;
+    --input: 192 20% 88%;
+    --ring: 192 80% 20%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 215 50% 16%;
-    --sidebar-foreground: 210 25% 90%;
-    --sidebar-primary: 210 40% 98%;
-    --sidebar-primary-foreground: 215 50% 16%;
-    --sidebar-accent: 215 45% 22%;
-    --sidebar-accent-foreground: 210 25% 90%;
-    --sidebar-border: 215 40% 25%;
-    --sidebar-ring: 210 60% 60%;
+    --sidebar-background: 192 80% 12%;
+    --sidebar-foreground: 190 25% 90%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 192 80% 12%;
+    --sidebar-accent: 192 70% 18%;
+    --sidebar-accent-foreground: 190 25% 90%;
+    --sidebar-border: 192 60% 22%;
+    --sidebar-ring: 24 95% 50%;
 
-    --chart-positive: 152 55% 40%;
+    --chart-positive: 172 65% 35%;
     --chart-negative: 0 72% 51%;
-    --chart-neutral: 215 15% 50%;
-    --chart-1: 215 50% 23%;
-    --chart-2: 160 45% 40%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 280 45% 50%;
-    --chart-5: 195 60% 45%;
+    --chart-neutral: 192 15% 45%;
+    --chart-1: 192 80% 20%;
+    --chart-2: 24 95% 50%;
+    --chart-3: 172 65% 35%;
+    --chart-4: 0 0% 15%;
+    --chart-5: 190 50% 45%;
 
     --font-display: 'DM Serif Display', serif;
     --font-body: 'Inter', sans-serif;
