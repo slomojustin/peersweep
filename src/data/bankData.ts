@@ -1,4 +1,4 @@
-// Mock bank data based on RSSD structure
+// Bank data loaded from /banks.json
 export interface BankInfo {
   rssd: string;
   name: string;
@@ -6,28 +6,14 @@ export interface BankInfo {
   state: string;
 }
 
-export const MOCK_BANKS: BankInfo[] = [
-  { rssd: "480228", name: "First National Bank", city: "Omaha", state: "NE" },
-  { rssd: "852218", name: "Heartland Community Bank", city: "Springfield", state: "IL" },
-  { rssd: "413208", name: "Prairie State Bank & Trust", city: "Des Moines", state: "IA" },
-  { rssd: "504713", name: "Citizens State Bank", city: "Kansas City", state: "MO" },
-  { rssd: "275216", name: "Farmers & Merchants Bank", city: "Lincoln", state: "NE" },
-  { rssd: "619842", name: "Heritage Community Bank", city: "Topeka", state: "KS" },
-  { rssd: "731045", name: "Midwest Federal Savings", city: "Wichita", state: "KS" },
-  { rssd: "385921", name: "Security Bank of the Plains", city: "Oklahoma City", state: "OK" },
-  { rssd: "942157", name: "Valley National Bank", city: "Sioux Falls", state: "SD" },
-  { rssd: "168493", name: "Cornerstone Bank", city: "Fargo", state: "ND" },
-  { rssd: "557382", name: "Great Plains National Bank", city: "Bismarck", state: "ND" },
-  { rssd: "894216", name: "American Heritage Bank", city: "Tulsa", state: "OK" },
-  { rssd: "321674", name: "Community First Bank", city: "Columbia", state: "MO" },
-  { rssd: "746893", name: "Tri-County State Bank", city: "Joplin", state: "MO" },
-  { rssd: "293847", name: "Pioneer Bank", city: "Rapid City", state: "SD" },
-  { rssd: "658124", name: "Platte Valley Bank", city: "Scottsbluff", state: "NE" },
-  { rssd: "412956", name: "Central Trust Bank", city: "Jefferson City", state: "MO" },
-  { rssd: "873219", name: "Great Western Bank", city: "Sioux City", state: "IA" },
-  { rssd: "539471", name: "Bank of the Ozarks", city: "Little Rock", state: "AR" },
-  { rssd: "184726", name: "Independence State Bank", city: "Independence", state: "KS" },
-];
+let _banksCache: BankInfo[] | null = null;
+
+export const loadBanks = async (): Promise<BankInfo[]> => {
+  if (_banksCache) return _banksCache;
+  const res = await fetch('/banks.json');
+  _banksCache = await res.json();
+  return _banksCache!;
+};
 
 export interface BankMetrics {
   quarter: string;
