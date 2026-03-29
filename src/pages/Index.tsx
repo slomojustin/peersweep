@@ -108,10 +108,7 @@ const Index = () => {
               Peer<span className="text-accent">Sweep</span>
             </h1>
             <p className="text-accent font-semibold tracking-wide uppercase text-sm mb-3">
-              Actionable Market Intel
-            </p>
-            <p className="text-muted-foreground text-lg max-w-md mx-auto">
-              AI-powered performance analytics for community banks. Regulator-aligned. Explainable. Fast.
+              Actionable Market Intel — Fast.
             </p>
           </div>
 
