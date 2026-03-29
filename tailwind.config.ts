@@ -15,6 +15,7 @@ export default {
     extend: {
       fontFamily: {
         display: ['DM Serif Display', 'serif'],
+        brand: ['Russo One', 'sans-serif'],
         body: ['Inter', 'sans-serif'],
       },
       colors: {
