@@ -101,16 +101,16 @@ const Index = () => {
       {/* Hero */}
       <div className="flex-1 flex items-center justify-center">
         <div className="container max-w-2xl py-16">
-          <div className="text-center mb-12 animate-fade-in">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <img src={peersweepLogo} alt="PeerSweep" className="h-12 w-12" />
+          <div className="flex items-center justify-center gap-5 mb-12 animate-fade-in">
+            <img src={peersweepLogo} alt="PeerSweep" className="h-20 w-20 object-contain" />
+            <div className="text-left">
+              <h1 className="font-display text-4xl md:text-5xl text-foreground mb-1">
+                Peer<span className="text-accent">Sweep</span>
+              </h1>
+              <p className="text-accent font-semibold tracking-wide uppercase text-sm">
+                Actionable Market Intel — Fast.
+              </p>
             </div>
-            <h1 className="font-display text-4xl md:text-5xl text-foreground mb-2">
-              Peer<span className="text-accent">Sweep</span>
-            </h1>
-            <p className="text-accent font-semibold tracking-wide uppercase text-sm mb-3">
-              Actionable Market Intel — Fast.
-            </p>
           </div>
 
           <div className="space-y-6 animate-fade-in" style={{ animationDelay: "0.15s" }}>
