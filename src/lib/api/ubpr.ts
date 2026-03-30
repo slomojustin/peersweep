@@ -1,28 +1,38 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { BankMetrics } from '@/data/bankData';
 
+interface UBPRQuarter {
+  quarter: string;
+  date: string;
+  roaa: number;
+  roae: number;
+  nim: number;
+  efficiencyRatio: number;
+  costOfFunds: number;
+  loanToDeposit: number;
+  tier1Capital: number;
+  totalCapital: number;
+  nplRatio: number;
+  allowanceRatio: number;
+}
+
 interface UBPRResponse {
   success: boolean;
   error?: string;
+  source?: 'cache' | 'live';
+  cachedAt?: string;
   data?: {
-    quarters: Array<{
-      quarter: string;
-      date: string;
-      roaa: number;
-      roae: number;
-      nim: number;
-      efficiencyRatio: number;
-      costOfFunds: number;
-      loanToDeposit: number;
-      tier1Capital: number;
-      totalCapital: number;
-      nplRatio: number;
-      allowanceRatio: number;
-    }>;
+    quarters: UBPRQuarter[];
   };
 }
 
-export const fetchUBPR = async (rssd: string, bankName: string): Promise<BankMetrics[]> => {
+export interface FetchUBPRResult {
+  metrics: BankMetrics[];
+  source: 'cache' | 'live';
+  cachedAt?: string;
+}
+
+export const fetchUBPR = async (rssd: string, bankName: string): Promise<FetchUBPRResult> => {
   const { data, error } = await supabase.functions.invoke<UBPRResponse>('fetch-ubpr', {
     body: { rssd, bankName },
   });
@@ -35,8 +45,7 @@ export const fetchUBPR = async (rssd: string, bankName: string): Promise<BankMet
     throw new Error(data?.error || 'No UBPR data returned');
   }
 
-  // Map the TinyFish response to our BankMetrics format
-  return data.data.quarters.map((q) => ({
+  const metrics = data.data.quarters.map((q) => ({
     quarter: q.quarter,
     roaa: Number(q.roaa) || 0,
     roae: Number(q.roae) || 0,
@@ -49,4 +58,10 @@ export const fetchUBPR = async (rssd: string, bankName: string): Promise<BankMet
     nplRatio: Number(q.nplRatio) || 0,
     allowanceRatio: Number(q.allowanceRatio) || 0,
   }));
+
+  return {
+    metrics,
+    source: data.source || 'live',
+    cachedAt: data.cachedAt,
+  };
 };

@@ -1,7 +1,11 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const CACHE_TTL_HOURS = 24 * 30; // 30 days - UBPR data updates quarterly
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -18,6 +22,32 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Initialize Supabase client with service role for cache writes
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Check cache first
+    const cacheExpiry = new Date(Date.now() - CACHE_TTL_HOURS * 60 * 60 * 1000).toISOString();
+    const { data: cached } = await supabase
+      .from('ubpr_cache')
+      .select('metrics, fetched_at')
+      .eq('rssd', rssd)
+      .gt('fetched_at', cacheExpiry)
+      .order('fetched_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (cached) {
+      console.log(`Cache hit for RSSD ${rssd} (fetched ${cached.fetched_at})`);
+      return new Response(
+        JSON.stringify({ success: true, data: cached.metrics, source: 'cache', cachedAt: cached.fetched_at }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Cache miss for RSSD ${rssd}, fetching from FFIEC CDR via TinyFish...`);
+
     const apiKey = Deno.env.get('TINYFISH_API_KEY');
     if (!apiKey) {
       return new Response(
@@ -25,8 +55,6 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    console.log(`Fetching UBPR for RSSD: ${rssd} (${bankName})`);
 
     // Use TinyFish to navigate the FFIEC CDR and extract UBPR data
     const tinyFishResponse = await fetch('https://agent.tinyfish.ai/v1/automation/run', {
@@ -96,7 +124,6 @@ Make sure all values are numbers (not strings). Include as many quarters as are 
     // Extract the result data
     let resultData = tinyFishResult.result;
     if (typeof resultData === 'string') {
-      // Try to parse JSON from the string
       const jsonStart = resultData.indexOf('{');
       const jsonEnd = resultData.lastIndexOf('}') + 1;
       if (jsonStart >= 0 && jsonEnd > jsonStart) {
@@ -108,8 +135,28 @@ Make sure all values are numbers (not strings). Include as many quarters as are 
       }
     }
 
+    // Cache the result
+    if (resultData?.quarters?.length > 0) {
+      const reportDate = resultData.quarters[0]?.date || new Date().toISOString().split('T')[0];
+      const { error: upsertError } = await supabase
+        .from('ubpr_cache')
+        .upsert({
+          rssd,
+          bank_name: bankName,
+          report_date: reportDate,
+          metrics: resultData,
+          fetched_at: new Date().toISOString(),
+        }, { onConflict: 'rssd,report_date' });
+
+      if (upsertError) {
+        console.error('Cache write error:', upsertError);
+      } else {
+        console.log(`Cached UBPR data for RSSD ${rssd}`);
+      }
+    }
+
     return new Response(
-      JSON.stringify({ success: true, data: resultData, bankName, rssd }),
+      JSON.stringify({ success: true, data: resultData, source: 'live', bankName, rssd }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
