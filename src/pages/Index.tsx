@@ -118,7 +118,7 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="insights">
-              <AINarrativePanel narratives={narratives} bankName={selectedBank.name} />
+              <AINarrativePanel narratives={narratives} bankName={selectedBank.name} metrics={metrics} />
             </TabsContent>
 
             <TabsContent value="peers">
