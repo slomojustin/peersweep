@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { type BankInfo, generateMockMetrics, generateNarrative } from "@/data/bankData";
+import { fetchUBPR } from "@/lib/api/ubpr";
 import BankSelector from "@/components/BankSelector";
 import UBPRReport from "@/components/UBPRReport";
 import AINarrativePanel from "@/components/AINarrativePanel";
@@ -8,20 +9,51 @@ import DepositAnalysis from "@/components/DepositAnalysis";
 import MarketResearch from "@/components/MarketResearch";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Brain, Users, Landmark, Globe, ArrowRight } from "lucide-react";
+import { BarChart3, Brain, Users, Landmark, Globe, ArrowRight, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import type { BankMetrics } from "@/data/bankData";
 
 
 const Index = () => {
   const [subjectBank, setSubjectBank] = useState<BankInfo[]>([]);
   const [peerBanks, setPeerBanks] = useState<BankInfo[]>([]);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [metrics, setMetrics] = useState<BankMetrics[]>([]);
+  const [dataSource, setDataSource] = useState<"live" | "mock">("live");
+  const { toast } = useToast();
 
   const selectedBank = subjectBank[0];
-  const metrics = selectedBank ? generateMockMetrics(selectedBank.rssd) : [];
-  const narratives = selectedBank ? generateNarrative(selectedBank, metrics) : [];
+  const narratives = selectedBank ? generateNarrative(selectedBank, metrics.length > 0 ? metrics : generateMockMetrics(selectedBank.rssd)) : [];
 
-  const handleAnalyze = () => {
-    if (selectedBank) setShowDashboard(true);
+  const handleAnalyze = async () => {
+    if (!selectedBank) return;
+    
+    setIsLoading(true);
+    try {
+      const ubprData = await fetchUBPR(selectedBank.rssd, selectedBank.name);
+      setMetrics(ubprData);
+      setDataSource("live");
+      setShowDashboard(true);
+      toast({
+        title: "Live FFIEC Data Loaded",
+        description: `UBPR data for ${selectedBank.name} retrieved successfully.`,
+      });
+    } catch (error) {
+      console.error("Failed to fetch live UBPR data:", error);
+      // Fall back to mock data
+      const mockData = generateMockMetrics(selectedBank.rssd);
+      setMetrics(mockData);
+      setDataSource("mock");
+      setShowDashboard(true);
+      toast({
+        title: "Using Sample Data",
+        description: "Could not reach FFIEC CDR. Showing estimated data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (showDashboard && selectedBank) {
@@ -37,6 +69,15 @@ const Index = () => {
               <span className="text-sm text-muted-foreground">
                 {selectedBank.name} | {selectedBank.rssd}
               </span>
+              {dataSource === "live" ? (
+                <span className="text-xs bg-green-500/10 text-green-600 px-2 py-0.5 rounded-full font-medium">
+                  Live FFIEC Data
+                </span>
+              ) : (
+                <span className="text-xs bg-yellow-500/10 text-yellow-600 px-2 py-0.5 rounded-full font-medium">
+                  Sample Data
+                </span>
+              )}
               <Button variant="outline" size="sm" onClick={() => setShowDashboard(false)}>
                 Change Bank
               </Button>
@@ -129,10 +170,19 @@ const Index = () => {
             <Button
               className="w-full h-12 text-base gap-2"
               onClick={handleAnalyze}
-              disabled={!selectedBank}
+              disabled={!selectedBank || isLoading}
             >
-              Analyze Performance
-              <ArrowRight className="h-4 w-4" />
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Fetching FFIEC Data…
+                </>
+              ) : (
+                <>
+                  Analyze Performance
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </Button>
           </div>
 
