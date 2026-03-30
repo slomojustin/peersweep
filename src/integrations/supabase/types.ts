@@ -14,7 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ubpr_cache: {
+        Row: {
+          bank_name: string | null
+          fetched_at: string
+          id: string
+          metrics: Json
+          report_date: string
+          rssd: string
+        }
+        Insert: {
+          bank_name?: string | null
+          fetched_at?: string
+          id?: string
+          metrics: Json
+          report_date: string
+          rssd: string
+        }
+        Update: {
+          bank_name?: string | null
+          fetched_at?: string
+          id?: string
+          metrics?: Json
+          report_date?: string
+          rssd?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
