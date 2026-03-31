@@ -114,7 +114,7 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="market">
-              <MarketResearch bankName={selectedBank.name} />
+              <MarketResearch bank={selectedBank} peerBanks={peerBanks} />
             </TabsContent>
           </Tabs>
         </main>
