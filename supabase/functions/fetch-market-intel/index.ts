@@ -71,50 +71,40 @@ Deno.serve(async (req) => {
     }
 
     // Build the peer bank names list for the prompt
-    const peerNamesList = (peerBanks || []).map((p: { name: string }) => p.name).join(', ');
+    const peerBankDetails = (peerBanks || []).map((p: { name: string; city?: string; state?: string }) => ({
+      name: p.name,
+      location: [p.city, p.state].filter(Boolean).join(', '),
+    }));
+    const peerNamesList = peerBankDetails.map(p => p.name).join(', ');
+    const peerDetailsForPrompt = peerBankDetails
+      .map(p => `  - ${p.name}${p.location ? ` (${p.location})` : ''}`)
+      .join('\n');
     const location = [city, state].filter(Boolean).join(', ');
 
     const goal = `I need comprehensive market intelligence for "${bankName}" (RSSD: ${rssd}) located in ${location || 'the United States'}.
 
-TASK 1 — Competitor Deposit Rates:
-Go to https://www.bankrate.com/banking/savings/best-high-yield-savings-accounts-rates/ and extract the top 10 savings/money market rates currently listed. Then go to https://www.bankrate.com/banking/cds/best-cd-rates/ and extract the top 10 CD rates (6-month, 12-month, 18-month, 24-month).
+TASK 1 — Peer Bank Website Rates:
+${peerNamesList ? `Visit the official websites of these peer banks and extract their currently advertised deposit rates (savings, money market, CDs of all terms). For each bank, go to their website and look for a "rates" or "personal banking" page:
+${peerDetailsForPrompt}` : 'Skip this task — no peer banks were selected.'}
 
-TASK 2 — FDIC Summary of Deposits:
-Go to https://www7.fdic.gov/sod/sodMarketBank.asp and search for "${bankName}" or RSSD/CERT number to find the bank's market share data. Extract:
-- Total deposits in the bank's primary market area
-- Number of branches
-- Market share percentage
-- Top competitors in the same market with their deposit totals and market share
+TASK 2 — Local News & Market Coverage:
+${location ? `Search Google News for recent articles about banking, deposit rates, branch openings, and financial services in the ${location} market area. Look for:
+- Local newspaper articles (e.g. "${city} business journal", "${city} times", local news outlets)
+- Articles mentioning ${bankName} or its competitors
+- Any news about rate changes, new branches, or banking promotions in the area
+Extract up to 10 relevant articles.` : 'Skip — no location provided.'}
 
-TASK 3 — Peer Bank Rates:
-${peerNamesList ? `Search Google for current deposit rates advertised by these peer banks: ${peerNamesList}. Check their websites for posted CD and savings rates.` : 'Skip this task — no peer banks were selected.'}
+TASK 3 — Social Media & Marketing:
+${peerNamesList ? `Search for the social media presence and recent marketing of these banks:
+${peerDetailsForPrompt}
+For each bank, check:
+- LinkedIn company page (search "site:linkedin.com/company [bank name]") — note follower count, recent posts about rates or promotions
+- Facebook page (search "site:facebook.com [bank name]") — note any promoted rates, community engagement
+- Instagram (search "site:instagram.com [bank name]") — note marketing campaigns or promotions
+Extract any deposit rate promotions, special offers, or marketing campaigns found.` : 'Skip — no peer banks selected.'}
 
 Return ALL results as a single JSON object with this exact structure:
 {
-  "competitorRates": [
-    {
-      "institution": "Bank Name",
-      "product": "High-Yield Savings",
-      "rate": 4.75,
-      "source": "bankrate.com",
-      "date": "2026-03"
-    }
-  ],
-  "fdicMarketShare": {
-    "bankName": "${bankName}",
-    "marketArea": "City, State MSA",
-    "totalDeposits": 500000000,
-    "branches": 5,
-    "marketSharePct": 2.5,
-    "competitors": [
-      {
-        "name": "Competitor Bank",
-        "deposits": 1000000000,
-        "branches": 10,
-        "marketSharePct": 5.0
-      }
-    ]
-  },
   "peerBankRates": [
     {
       "bankName": "Peer Bank Name",
@@ -122,10 +112,29 @@ Return ALL results as a single JSON object with this exact structure:
       "rate": 4.50,
       "source": "bankwebsite.com"
     }
+  ],
+  "localNews": [
+    {
+      "headline": "Article title",
+      "source": "Local Newspaper Name",
+      "url": "https://...",
+      "date": "2026-03-28",
+      "summary": "Brief 1-2 sentence summary of the article's relevance to local banking"
+    }
+  ],
+  "socialMedia": [
+    {
+      "bankName": "Peer Bank Name",
+      "platform": "LinkedIn",
+      "profileUrl": "https://linkedin.com/company/...",
+      "followers": 5000,
+      "recentPromo": "Currently promoting 5.00% APY 12-month CD special",
+      "lastPostDate": "2026-03-25"
+    }
   ]
 }
 
-All rate values must be numbers (not strings). Deposit values in raw dollars (no formatting).`;
+All rate values must be numbers (not strings). If a field is not found, use null.`;
 
     console.log(`Starting market intel TinyFish run for ${bankName}...`);
 
