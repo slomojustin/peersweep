@@ -200,9 +200,6 @@ const Index = () => {
             ))}
           </div>
 
-          <div className="mt-10 animate-fade-in" style={{ animationDelay: "0.45s" }}>
-            <BulkDownloadPanel />
-          </div>
         </div>
       </div>
 
