@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { type BankInfo, generateMockMetrics, generateNarrative } from "@/data/bankData";
 import { fetchUBPR } from "@/lib/api/ubpr";
 import BankSelector from "@/components/BankSelector";
