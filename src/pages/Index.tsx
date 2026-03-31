@@ -65,7 +65,9 @@ const Index = () => {
         <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="container flex items-center justify-between h-14">
             <div className="flex items-center gap-2">
-              <span className="font-brand text-lg"><span className="text-primary">Peer</span><span className="text-accent">Sweep</span></span>
+              <button onClick={() => setShowDashboard(false)} className="font-brand text-lg cursor-pointer hover:opacity-80 transition-opacity">
+                <span className="text-primary">Peer</span><span className="text-accent">Sweep</span>
+              </button>
             </div>
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground">
