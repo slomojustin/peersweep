@@ -11,8 +11,9 @@ interface UploadedFile {
   name: string;
   storagePath: string;
   size: number;
-  status: "uploaded" | "processing" | "done" | "error";
-  result?: { totalRecords?: number; inserted?: number; errors?: number };
+  status: "uploading" | "uploaded" | "processing" | "done" | "error";
+  jobId?: string;
+  progress?: { totalRecords: number; inserted: number; errors: number; offset: number };
   error?: string;
 }
 
@@ -22,76 +23,99 @@ const AdminUpload = () => {
   const [dragOver, setDragOver] = useState(false);
   const { toast } = useToast();
 
+  const updateFile = (index: number, updates: Partial<UploadedFile>) => {
+    setFiles((prev) => prev.map((f, i) => (i === index ? { ...f, ...updates } : f)));
+  };
+
   const handleFiles = useCallback(async (fileList: FileList) => {
     setUploading(true);
-    const newFiles: UploadedFile[] = [];
 
     for (const file of Array.from(fileList)) {
       const storagePath = `bulk-uploads/${Date.now()}-${file.name}`;
+      const idx = files.length;
+      const newFile: UploadedFile = { name: file.name, storagePath, size: file.size, status: "uploading" };
+
+      setFiles((prev) => [...prev, newFile]);
 
       try {
         const { error } = await supabase.storage
           .from("ubpr-reports")
           .upload(storagePath, file, { contentType: "application/xml", upsert: true });
-
         if (error) throw error;
 
-        newFiles.push({
-          name: file.name,
-          storagePath,
-          size: file.size,
-          status: "uploaded",
-        });
+        setFiles((prev) =>
+          prev.map((f) => (f.storagePath === storagePath ? { ...f, status: "uploaded" as const } : f))
+        );
       } catch (err: any) {
-        newFiles.push({
-          name: file.name,
-          storagePath,
-          size: file.size,
-          status: "error",
-          error: err.message || "Upload failed",
-        });
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.storagePath === storagePath
+              ? { ...f, status: "error" as const, error: err.message || "Upload failed" }
+              : f
+          )
+        );
       }
     }
 
-    setFiles((prev) => [...prev, ...newFiles]);
     setUploading(false);
-
-    const successCount = newFiles.filter((f) => f.status === "uploaded").length;
-    if (successCount > 0) {
-      toast({ title: `${successCount} file(s) uploaded`, description: "Ready to process into database." });
-    }
-  }, [toast]);
+    toast({ title: "Upload complete", description: "Files ready to process." });
+  }, [files.length, toast]);
 
   const processFile = async (index: number) => {
     const file = files[index];
     if (!file || file.status !== "uploaded") return;
 
-    setFiles((prev) => prev.map((f, i) => (i === index ? { ...f, status: "processing" } : f)));
+    updateFile(index, { status: "processing" });
 
     try {
-      const { data, error } = await supabase.functions.invoke("process-bulk-ubpr", {
-        body: { storagePath: file.storagePath },
-      });
-
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "Processing failed");
-
-      setFiles((prev) =>
-        prev.map((f, i) =>
-          i === index ? { ...f, status: "done", result: data } : f
-        )
+      // Step 1: Enqueue job
+      const { data: enqueueData, error: enqueueError } = await supabase.functions.invoke(
+        "process-bulk-ubpr",
+        { body: { action: "enqueue", storagePath: file.storagePath, fileName: file.name } }
       );
 
-      toast({
-        title: "Processing complete",
-        description: `${data.inserted} bank records inserted from ${file.name}`,
-      });
+      if (enqueueError) throw enqueueError;
+      if (!enqueueData?.success) throw new Error(enqueueData?.error || "Failed to enqueue");
+
+      const jobId = enqueueData.jobId;
+      updateFile(index, { jobId });
+
+      // Step 2: Process in chunks by polling
+      let isDone = false;
+      while (!isDone) {
+        const { data: chunkData, error: chunkError } = await supabase.functions.invoke(
+          "process-bulk-ubpr",
+          { body: { action: "process-chunk", jobId } }
+        );
+
+        if (chunkError) throw chunkError;
+        if (!chunkData?.success) throw new Error(chunkData?.error || "Processing failed");
+
+        const progress = chunkData.progress || chunkData;
+        updateFile(index, {
+          progress: {
+            totalRecords: progress.totalRecords || 0,
+            inserted: progress.inserted || 0,
+            errors: progress.errors || 0,
+            offset: progress.offset || 0,
+          },
+        });
+
+        if (chunkData.status === "completed") {
+          isDone = true;
+          updateFile(index, { status: "done" });
+          toast({
+            title: "Processing complete",
+            description: `${progress.inserted} bank records from ${file.name}`,
+          });
+        } else if (chunkData.status === "failed") {
+          throw new Error(chunkData.error || "Processing failed");
+        }
+        // otherwise status is 'processing', loop continues
+      }
     } catch (err: any) {
-      setFiles((prev) =>
-        prev.map((f, i) =>
-          i === index ? { ...f, status: "error", error: err.message } : f
-        )
-      );
+      updateFile(index, { status: "error", error: err.message });
+      toast({ title: "Processing error", description: err.message, variant: "destructive" });
     }
   };
 
@@ -142,8 +166,7 @@ const AdminUpload = () => {
               Upload UBPR Bulk XBRL Files
             </CardTitle>
             <CardDescription>
-              Upload XBRL files from the FFIEC CDR Bulk Data Download. Each file will be parsed
-              and all bank records inserted into the database.
+              Upload XBRL files from FFIEC CDR. Files are processed in chunks to handle large datasets.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -169,7 +192,7 @@ const AdminUpload = () => {
               {uploading ? (
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">Uploading…</p>
+                  <p className="text-sm text-muted-foreground">Uploading to storage…</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2">
@@ -194,24 +217,34 @@ const AdminUpload = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               {files.map((file, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                  <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{file.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(file.size / 1024 / 1024).toFixed(1)} MB
-                      {file.result && ` • ${file.result.inserted} records inserted`}
-                      {file.error && ` • ${file.error}`}
-                    </p>
+                <div key={file.storagePath} className="p-3 rounded-lg bg-muted/50 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{file.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(file.size / 1024 / 1024).toFixed(1)} MB
+                        {file.progress &&
+                          ` • ${file.progress.inserted}/${file.progress.totalRecords} records`}
+                        {file.error && ` • ${file.error}`}
+                      </p>
+                    </div>
+                    {file.status === "uploading" && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                    {file.status === "uploaded" && (
+                      <Button size="sm" variant="outline" onClick={() => processFile(i)}>
+                        Process
+                      </Button>
+                    )}
+                    {file.status === "processing" && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                    {file.status === "done" && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+                    {file.status === "error" && <AlertCircle className="h-5 w-5 text-destructive" />}
                   </div>
-                  {file.status === "uploaded" && (
-                    <Button size="sm" variant="outline" onClick={() => processFile(i)}>
-                      Process
-                    </Button>
+                  {file.status === "processing" && file.progress && file.progress.totalRecords > 0 && (
+                    <Progress
+                      value={(file.progress.offset / file.progress.totalRecords) * 100}
+                      className="h-2"
+                    />
                   )}
-                  {file.status === "processing" && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-                  {file.status === "done" && <CheckCircle2 className="h-5 w-5 text-green-500" />}
-                  {file.status === "error" && <AlertCircle className="h-5 w-5 text-destructive" />}
                 </div>
               ))}
             </CardContent>
