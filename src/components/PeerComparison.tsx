@@ -15,6 +15,23 @@ interface PeerComparisonProps {
   peerBanks: BankInfo[];
 }
 
+type MetricRow = {
+  label: string;
+  getValue: (m: BankMetrics) => number;
+  higher: boolean; // true = higher is favorable
+};
+
+const metricRows: MetricRow[] = [
+  { label: "ROAA (%)", getValue: m => m.roaa, higher: true },
+  { label: "Net Interest Margin (%)", getValue: m => m.nim, higher: true },
+  { label: "Efficiency Ratio (%)", getValue: m => m.efficiencyRatio, higher: false },
+  { label: "Cost of Funds (%)", getValue: m => m.costOfFunds, higher: false },
+  { label: "Net Loans & Leases to Deposits (%)", getValue: m => m.loanToDeposit, higher: true },
+  { label: "Total Interest Bearing Deposits (%)", getValue: m => m.costOfFunds, higher: false },
+  { label: "Tier 1 Capital (%)", getValue: m => m.tier1Capital, higher: true },
+  { label: "NPL Ratio (%)", getValue: m => m.nplRatio, higher: false },
+];
+
 const PeerComparison = ({ subjectBank, subjectMetrics, peerBanks }: PeerComparisonProps) => {
   const latest = subjectMetrics[0];
   const peerData = peerBanks.map(bank => ({
@@ -26,16 +43,6 @@ const PeerComparison = ({ subjectBank, subjectMetrics, peerBanks }: PeerComparis
     if (peerData.length === 0) return 0;
     return +(peerData.reduce((sum, p) => sum + fn(p.metrics), 0) / peerData.length).toFixed(2);
   };
-
-  const rows = [
-    { label: "ROAA (%)", subject: latest.roaa, peer: peerAvg(m => m.roaa), higher: true },
-    { label: "ROAE (%)", subject: latest.roae, peer: peerAvg(m => m.roae), higher: true },
-    { label: "Net Interest Margin (%)", subject: latest.nim, peer: peerAvg(m => m.nim), higher: true },
-    { label: "Efficiency Ratio (%)", subject: latest.efficiencyRatio, peer: peerAvg(m => m.efficiencyRatio), higher: false },
-    { label: "Cost of Funds (%)", subject: latest.costOfFunds, peer: peerAvg(m => m.costOfFunds), higher: false },
-    { label: "Tier 1 Capital (%)", subject: latest.tier1Capital, peer: peerAvg(m => m.tier1Capital), higher: true },
-    { label: "NPL Ratio (%)", subject: latest.nplRatio, peer: peerAvg(m => m.nplRatio), higher: false },
-  ];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -57,19 +64,31 @@ const PeerComparison = ({ subjectBank, subjectMetrics, peerBanks }: PeerComparis
               <TableRow className="bg-primary/5">
                 <TableHead className="font-semibold">Metric</TableHead>
                 <TableHead className="text-right font-semibold">{subjectBank.name}</TableHead>
-                <TableHead className="text-right font-semibold">Peer Average</TableHead>
+                {peerData.map(({ bank }) => (
+                  <TableHead key={bank.rssd} className="text-right font-semibold text-xs">
+                    {bank.name}
+                  </TableHead>
+                ))}
+                <TableHead className="text-right font-semibold bg-muted/30">Peer Avg</TableHead>
                 <TableHead className="text-right font-semibold">Variance</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => {
-                const variance = +(row.subject - row.peer).toFixed(2);
+              {metricRows.map((row) => {
+                const subjectVal = row.getValue(latest);
+                const avg = peerAvg(row.getValue);
+                const variance = +(subjectVal - avg).toFixed(2);
                 const favorable = row.higher ? variance > 0 : variance < 0;
                 return (
                   <TableRow key={row.label}>
                     <TableCell className="font-medium text-sm">{row.label}</TableCell>
-                    <TableCell className="text-right tabular-nums text-sm">{row.subject}</TableCell>
-                    <TableCell className="text-right tabular-nums text-sm">{row.peer}</TableCell>
+                    <TableCell className="text-right tabular-nums text-sm font-semibold">{subjectVal}</TableCell>
+                    {peerData.map(({ bank, metrics }) => (
+                      <TableCell key={bank.rssd} className="text-right tabular-nums text-sm">
+                        {row.getValue(metrics)}
+                      </TableCell>
+                    ))}
+                    <TableCell className="text-right tabular-nums text-sm bg-muted/30 font-medium">{avg}</TableCell>
                     <TableCell className={`text-right tabular-nums text-sm font-semibold ${favorable ? 'text-success' : 'text-destructive'}`}>
                       {variance > 0 ? '+' : ''}{variance}
                     </TableCell>
