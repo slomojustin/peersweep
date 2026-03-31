@@ -1,0 +1,2 @@
+ALTER TABLE public.ffiec_report_jobs DROP CONSTRAINT IF EXISTS ffiec_report_jobs_report_type_check;
+ALTER TABLE public.ffiec_report_jobs ADD CONSTRAINT ffiec_report_jobs_report_type_check CHECK (report_type IN ('ubpr_metrics', 'ubpr_pdf', 'market_intel'));
