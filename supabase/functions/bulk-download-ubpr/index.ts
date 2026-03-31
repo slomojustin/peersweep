@@ -50,7 +50,6 @@ Deno.serve(async (req) => {
 4. Click the "Download" button.
 5. Wait for the file to download completely.
 6. Return the result as JSON with any download URLs or file information you captured: {"downloadUrl": "...", "fileName": "..."}`,
-        browser_profile: 'full',
       }),
     });
 
