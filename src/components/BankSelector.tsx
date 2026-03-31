@@ -63,6 +63,7 @@ const BankSelector = ({ label, description, selected, onSelect, multiple = false
       } else if (selected.length < maxSelections) {
         onSelect([...selected, bank]);
       }
+      setSearch("");
     } else {
       onSelect([bank]);
       setOpen(false);
