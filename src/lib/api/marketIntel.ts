@@ -33,10 +33,29 @@ export interface PeerBankRate {
   source: string;
 }
 
+export interface LocalNewsItem {
+  headline: string;
+  source: string;
+  url: string | null;
+  date: string | null;
+  summary: string;
+}
+
+export interface SocialMediaEntry {
+  bankName: string;
+  platform: string;
+  profileUrl: string | null;
+  followers: number | null;
+  recentPromo: string | null;
+  lastPostDate: string | null;
+}
+
 export interface MarketIntelData {
-  competitorRates: CompetitorRate[];
-  fdicMarketShare: FDICMarketShare | null;
-  peerBankRates: PeerBankRate[];
+  competitorRates?: CompetitorRate[];
+  fdicMarketShare?: FDICMarketShare | null;
+  peerBankRates?: PeerBankRate[];
+  localNews?: LocalNewsItem[];
+  socialMedia?: SocialMediaEntry[];
 }
 
 interface MarketIntelResponse {
