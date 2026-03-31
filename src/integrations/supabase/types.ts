@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      ffiec_report_jobs: {
+        Row: {
+          bank_name: string | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          report_type: string
+          result_metrics: Json | null
+          result_pdf_url: string | null
+          rssd: string
+          source: string | null
+          status: string
+          tinyfish_run_id: string | null
+          tinyfish_streaming_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          bank_name?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          report_type?: string
+          result_metrics?: Json | null
+          result_pdf_url?: string | null
+          rssd: string
+          source?: string | null
+          status?: string
+          tinyfish_run_id?: string | null
+          tinyfish_streaming_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bank_name?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          report_type?: string
+          result_metrics?: Json | null
+          result_pdf_url?: string | null
+          rssd?: string
+          source?: string | null
+          status?: string
+          tinyfish_run_id?: string | null
+          tinyfish_streaming_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ubpr_cache: {
         Row: {
           bank_name: string | null

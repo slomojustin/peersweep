@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
     if (!rssd) {
       return new Response(
         JSON.stringify({ success: false, error: 'RSSD ID is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -24,36 +24,31 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check if we already have this PDF in storage
     const storagePath = `${rssd}/ubpr-latest.pdf`;
     const { data: existingFile } = await supabase.storage
       .from('ubpr-reports')
       .list(rssd, { limit: 1, search: 'ubpr-latest.pdf' });
 
     if (existingFile && existingFile.length > 0) {
-      const { data: urlData } = supabase.storage
-        .from('ubpr-reports')
-        .getPublicUrl(storagePath);
-
+      const { data: urlData } = supabase.storage.from('ubpr-reports').getPublicUrl(storagePath);
       console.log(`PDF already cached for RSSD ${rssd}`);
       return new Response(
         JSON.stringify({ success: true, pdfUrl: urlData.publicUrl, source: 'cache' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
-
-    console.log(`No cached PDF for RSSD ${rssd}, fetching from FFIEC CDR via TinyFish...`);
 
     const apiKey = Deno.env.get('TINYFISH_API_KEY');
     if (!apiKey) {
       return new Response(
         JSON.stringify({ success: false, error: 'TinyFish API key not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    // Use TinyFish to navigate the FFIEC CDR and download the UBPR PDF
-    const tinyFishResponse = await fetch('https://agent.tinyfish.ai/v1/automation/run', {
+    console.log(`No cached PDF for RSSD ${rssd}, starting async TinyFish PDF run...`);
+
+    const tinyFishResponse = await fetch('https://agent.tinyfish.ai/v1/automation/run-async', {
       method: 'POST',
       headers: {
         'X-API-Key': apiKey,
@@ -61,121 +56,63 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         url: 'https://cdr.ffiec.gov/public/ManageFacsimiles.aspx',
-        goal: `On this FFIEC CDR page, I need to download the UBPR (Uniform Bank Performance Report) PDF for a specific bank:
-
-1. In the "Financial Institution" field or search box, enter the RSSD ID: ${rssd}
-2. If there's a search button, click it to find the institution "${bankName}"
-3. Select "UBPR" as the report type
-4. Select the most recent report date available
-5. Click the button to generate/view the PDF report
-6. Download the PDF file
-
-Return the download URL of the PDF file. If a PDF was downloaded or displayed, return the URL where the PDF can be accessed. Format as JSON: {"pdfUrl": "https://..."}`,
+        goal: `On this FFIEC CDR page, I need to download the UBPR (Uniform Bank Performance Report) PDF for a specific bank:\n\n1. In the "Financial Institution" field or search box, enter the RSSD ID: ${rssd}\n2. If there's a search button, click it to find the institution "${bankName}"\n3. Select "UBPR" as the report type\n4. Select the most recent report date available\n5. Click the button to generate/view the PDF report\n6. Return the final PDF URL or download URL as JSON in this format: {"pdfUrl": "https://..."}\n\nIf you cannot extract a direct PDF URL, return a JSON object describing that the PDF could not be automatically extracted.`,
         browser_profile: 'lite',
-        download: true,
       }),
     });
 
     if (!tinyFishResponse.ok) {
       const errorText = await tinyFishResponse.text();
-      console.error('TinyFish error:', errorText);
+      console.error('TinyFish async PDF start error:', errorText);
       return new Response(
         JSON.stringify({ success: false, error: `TinyFish API error: ${tinyFishResponse.status}` }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
     const tinyFishResult = await tinyFishResponse.json();
-    console.log('TinyFish result:', JSON.stringify(tinyFishResult).substring(0, 500));
+    const runId = tinyFishResult?.run_id;
 
-    // Try to get the PDF URL from TinyFish result
-    let pdfSourceUrl: string | null = null;
-    
-    // Check if TinyFish returned a download URL
-    if (tinyFishResult.downloads && tinyFishResult.downloads.length > 0) {
-      pdfSourceUrl = tinyFishResult.downloads[0].url || tinyFishResult.downloads[0];
-    }
-    
-    // Check result field
-    if (!pdfSourceUrl && tinyFishResult.result) {
-      let resultData = tinyFishResult.result;
-      if (typeof resultData === 'string') {
-        const jsonStart = resultData.indexOf('{');
-        const jsonEnd = resultData.lastIndexOf('}') + 1;
-        if (jsonStart >= 0 && jsonEnd > jsonStart) {
-          try {
-            const parsed = JSON.parse(resultData.substring(jsonStart, jsonEnd));
-            pdfSourceUrl = parsed.pdfUrl || parsed.url || parsed.downloadUrl;
-          } catch (e) {
-            // Check if the result itself is a URL
-            if (resultData.includes('http') && resultData.includes('.pdf')) {
-              const urlMatch = resultData.match(/https?:\/\/[^\s"']+\.pdf[^\s"']*/);
-              if (urlMatch) pdfSourceUrl = urlMatch[0];
-            }
-          }
-        }
-      } else if (resultData.pdfUrl) {
-        pdfSourceUrl = resultData.pdfUrl;
-      }
-    }
-
-    if (!pdfSourceUrl) {
-      // If TinyFish couldn't get the PDF, construct the FFIEC CDR direct URL
-      // The FFIEC CDR has a pattern for UBPR reports
-      console.log('Could not extract PDF URL from TinyFish, returning FFIEC CDR link');
-      const ffiecUrl = `https://cdr.ffiec.gov/public/ManageFacsimiles.aspx`;
+    if (!runId) {
+      console.error('TinyFish async PDF run did not return a run_id:', tinyFishResult);
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          pdfUrl: null, 
-          ffiecUrl,
-          message: 'Could not automatically download PDF. Use the FFIEC CDR link to access the report.',
-          source: 'fallback' 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'TinyFish did not return a run ID' }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    // Download the PDF and store it in Supabase Storage
-    try {
-      const pdfResponse = await fetch(pdfSourceUrl);
-      if (pdfResponse.ok) {
-        const pdfBuffer = await pdfResponse.arrayBuffer();
-        const { error: uploadError } = await supabase.storage
-          .from('ubpr-reports')
-          .upload(storagePath, pdfBuffer, {
-            contentType: 'application/pdf',
-            upsert: true,
-          });
+    const { data: job, error: jobError } = await supabase
+      .from('ffiec_report_jobs')
+      .insert({
+        rssd,
+        bank_name: bankName,
+        report_type: 'ubpr_pdf',
+        status: 'processing',
+        source: 'live',
+        tinyfish_run_id: runId,
+      })
+      .select('id')
+      .single();
 
-        if (uploadError) {
-          console.error('Storage upload error:', uploadError);
-        } else {
-          console.log(`PDF stored for RSSD ${rssd}`);
-          const { data: urlData } = supabase.storage
-            .from('ubpr-reports')
-            .getPublicUrl(storagePath);
-
-          return new Response(
-            JSON.stringify({ success: true, pdfUrl: urlData.publicUrl, source: 'live' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      }
-    } catch (downloadErr) {
-      console.error('Failed to download/store PDF:', downloadErr);
+    if (jobError || !job) {
+      console.error('PDF job insert error:', jobError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Failed to create FFIEC PDF job' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
-    // If storage failed, return the source URL directly
+    console.log(`Started TinyFish async PDF run ${runId} for RSSD ${rssd}`);
+
     return new Response(
-      JSON.stringify({ success: true, pdfUrl: pdfSourceUrl, source: 'live' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: true, source: 'live', status: 'processing', jobId: job.id }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {
     console.error('Error fetching UBPR PDF:', error);
     return new Response(
       JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });

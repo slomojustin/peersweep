@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { pollFFIECJob } from '@/lib/api/ffiecJobs';
 
 interface UBPRPdfResponse {
   success: boolean;
@@ -7,6 +8,8 @@ interface UBPRPdfResponse {
   ffiecUrl?: string;
   message?: string;
   source?: 'cache' | 'live' | 'fallback';
+  status?: 'processing' | 'completed' | 'failed';
+  jobId?: string;
 }
 
 export const fetchUBPRPdf = async (rssd: string, bankName: string): Promise<UBPRPdfResponse> => {
@@ -20,6 +23,26 @@ export const fetchUBPRPdf = async (rssd: string, bankName: string): Promise<UBPR
 
   if (!data?.success) {
     throw new Error(data?.error || 'Failed to retrieve UBPR PDF');
+  }
+
+  if (data.pdfUrl || data.source === 'cache') {
+    return data;
+  }
+
+  if (data.status === 'processing' && data.jobId) {
+    const finalJob = await pollFFIECJob(data.jobId);
+
+    if (finalJob.status === 'failed') {
+      throw new Error(finalJob.error || 'Failed to retrieve UBPR PDF');
+    }
+
+    return {
+      success: true,
+      pdfUrl: finalJob.pdfUrl,
+      ffiecUrl: finalJob.ffiecUrl,
+      message: finalJob.message,
+      source: finalJob.source,
+    };
   }
 
   return data;
