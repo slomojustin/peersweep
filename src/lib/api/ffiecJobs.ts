@@ -16,8 +16,8 @@ export interface FFIECJobStatusResponse {
   streamingUrl?: string | null;
 }
 
-const POLL_INTERVAL_MS = 3000;
-const MAX_POLL_ATTEMPTS = 60;
+const POLL_INTERVAL_MS = 5000;
+const MAX_POLL_ATTEMPTS = 120;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
