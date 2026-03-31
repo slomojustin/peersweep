@@ -1,0 +1,1 @@
+UPDATE public.ffiec_report_jobs SET status = 'failed', error_message = 'Stale job - retry needed', result_metrics = NULL WHERE id = 'aaa5e235-df30-4612-b3f2-fb048be54daa'
