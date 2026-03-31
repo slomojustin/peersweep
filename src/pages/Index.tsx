@@ -200,11 +200,12 @@ const Index = () => {
               </button>
             ))}
           </div>
-        </div>
-          </div>
 
           <div className="mt-10 animate-fade-in" style={{ animationDelay: "0.45s" }}>
             <BulkDownloadPanel />
+          </div>
+        </div>
+      </div>
 
       <footer className="border-t py-4 text-center text-xs text-muted-foreground">
         Data sourced from FFIEC CDR • AI-powered analysis • Not a substitute for regulatory examination
