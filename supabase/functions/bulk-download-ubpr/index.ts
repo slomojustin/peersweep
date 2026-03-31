@@ -12,7 +12,6 @@ Deno.serve(async (req) => {
 
   try {
     const { reportDate } = await req.json();
-    // reportDate e.g. "12/31/2024" or "03/31/2024"
 
     if (!reportDate) {
       return new Response(
@@ -43,16 +42,14 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         url: 'https://cdr.ffiec.gov/public/PWS/DownloadBulkData.aspx',
-        goal: `On this FFIEC CDR Bulk Data Download page, I need to download the UBPR bulk data file:
+        goal: `On this FFIEC CDR Bulk Data Download page, download the UBPR bulk data file:
 
-1. Look for a dropdown or selection for "Products" or report type. Select "UBPR" (Uniform Bank Performance Report).
-2. Look for a dropdown to select the report period/date. Select "${reportDate}" or the closest available date.
-3. Look for a file format option. If available, select "XBRL" format.
-4. Click the "Download" button to start the download.
-5. Return the direct download URL of the file as JSON: {"downloadUrl": "https://..."}
-
-If there is no direct download URL visible, return the URL that the download button navigates to. If a file downloads directly, describe what happened and provide any URL you can capture.`,
-        browser_profile: 'lite',
+1. In the "Available Products" list, select "UBPR Ratio -- Single Period".
+2. In the "Reporting Period End Date" dropdown, select "${reportDate}" or the closest matching date.
+3. For file format, select "Tab Delimited" (not XBRL).
+4. Click the "Download" button.
+5. Wait for the file to download completely.
+6. Return the result as JSON with any download URLs or file information you captured: {"downloadUrl": "...", "fileName": "..."}`,
       }),
     });
 
@@ -66,17 +63,17 @@ If there is no direct download URL visible, return the URL that the download but
     }
 
     const tinyFishResult = await tinyFishResponse.json();
+    console.log('TinyFish response:', JSON.stringify(tinyFishResult));
     const runId = tinyFishResult?.run_id;
 
     if (!runId) {
-      console.error('TinyFish did not return a run_id:', tinyFishResult);
+      console.error('TinyFish did not return a run_id:', JSON.stringify(tinyFishResult));
       return new Response(
-        JSON.stringify({ success: false, error: 'TinyFish did not return a run ID' }),
+        JSON.stringify({ success: false, error: 'TinyFish did not return a run ID', details: tinyFishResult }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    // Track the job
     const { data: job, error: jobError } = await supabase
       .from('ffiec_report_jobs')
       .insert({
@@ -91,9 +88,9 @@ If there is no direct download URL visible, return the URL that the download but
       .single();
 
     if (jobError || !job) {
-      console.error('Bulk download job insert error:', jobError);
+      console.error('Bulk download job insert error:', JSON.stringify(jobError));
       return new Response(
-        JSON.stringify({ success: false, error: 'Failed to create bulk download job' }),
+        JSON.stringify({ success: false, error: 'Failed to create bulk download job', details: jobError }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
