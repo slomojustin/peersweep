@@ -233,6 +233,76 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (job.report_type === 'ubpr_bulk') {
+      // For bulk downloads, look for download URLs in TinyFish results
+      const parsedResult = parseJsonLikeResult(runData?.result);
+      const downloads = Array.isArray(runData?.downloads) ? runData.downloads : [];
+      const downloadUrl = 
+        parsedResult?.downloadUrl ??
+        downloads[0]?.url ??
+        downloads[0] ??
+        null;
+
+      console.log('Bulk download TinyFish result:', JSON.stringify({ parsedResult, downloads, downloadUrl }));
+
+      if (downloadUrl && typeof downloadUrl === 'string') {
+        // Store the download URL and mark as completed - processing happens separately
+        await supabase
+          .from('ffiec_report_jobs')
+          .update({
+            status: 'completed',
+            source: 'live',
+            result_pdf_url: downloadUrl,
+            result_metrics: parsedResult,
+            tinyfish_streaming_url: streamingUrl,
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', job.id);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            jobId: job.id,
+            reportType: job.report_type,
+            status: 'completed',
+            source: 'live',
+            downloadUrl,
+            streamingUrl,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
+      // TinyFish completed but no download URL found
+      const resultStr = typeof runData?.result === 'string' ? runData.result : JSON.stringify(runData?.result);
+      console.log('Bulk download - no download URL found. Full result:', resultStr);
+
+      await supabase
+        .from('ffiec_report_jobs')
+        .update({
+          status: 'completed',
+          source: 'fallback',
+          error_message: 'TinyFish completed but could not capture the download URL. The FFIEC bulk download may require manual retrieval.',
+          result_metrics: { rawResult: resultStr, downloads },
+          tinyfish_streaming_url: streamingUrl,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', job.id);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          jobId: job.id,
+          reportType: job.report_type,
+          status: 'completed',
+          source: 'fallback',
+          rawResult: resultStr,
+          streamingUrl,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     if (job.report_type === 'market_intel') {
       const parsedResult = parseJsonLikeResult(runData?.result);
 
