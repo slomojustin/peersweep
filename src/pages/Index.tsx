@@ -33,6 +33,7 @@ const Index = () => {
     
     setIsLoading(true);
     try {
+      const result = await fetchUBPR(selectedBank.rssd, selectedBank.name);
       setMetrics(result.metrics);
       setDataSource(result.source === "cache" ? "live" : "live");
       setAnalysisReady(true);
