@@ -58,8 +58,8 @@ const PeerComparison = ({ subjectBank, subjectMetrics, peerBanks }: PeerComparis
           <p className="text-muted-foreground">Select peer banks to enable comparison analysis.</p>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <Table>
+        <Card className="overflow-hidden overflow-x-auto">
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow className="bg-primary/5">
                 <TableHead className="font-semibold">Metric</TableHead>
