@@ -75,7 +75,7 @@ const Index = () => {
         {/* Dashboard Content */}
         <main className="container py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5 h-11">
+            <TabsList className="grid w-full grid-cols-6 h-11">
               <TabsTrigger value="ubpr" className="gap-2 text-xs">
                 <FileText className="h-3.5 w-3.5" />
                 FFIEC Reports
@@ -95,6 +95,10 @@ const Index = () => {
               <TabsTrigger value="market" className="gap-2 text-xs">
                 <Globe className="h-3.5 w-3.5" />
                 Market
+              </TabsTrigger>
+              <TabsTrigger value="bulk" className="gap-2 text-xs">
+                <Database className="h-3.5 w-3.5" />
+                Bulk Data
               </TabsTrigger>
             </TabsList>
 
