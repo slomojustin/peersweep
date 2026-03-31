@@ -10,7 +10,7 @@ import DepositAnalysis from "@/components/DepositAnalysis";
 import MarketResearch from "@/components/MarketResearch";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Brain, Users, Landmark, Globe, ArrowRight, Loader2 } from "lucide-react";
+import { BarChart3, Brain, Users, Landmark, Globe, ArrowRight, Loader2, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { BankMetrics } from "@/data/bankData";
 
@@ -97,8 +97,8 @@ const Index = () => {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-5 h-11">
               <TabsTrigger value="ubpr" className="gap-2 text-xs">
-                <BarChart3 className="h-3.5 w-3.5" />
-                UBPR Report
+                <FileText className="h-3.5 w-3.5" />
+                FFIEC Reports
               </TabsTrigger>
               <TabsTrigger value="insights" className="gap-2 text-xs">
                 <Brain className="h-3.5 w-3.5" />
