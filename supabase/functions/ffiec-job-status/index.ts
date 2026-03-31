@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
     }
 
     if (job.status === 'completed') {
-      if (job.report_type === 'ubpr_metrics') {
+      if (job.report_type === 'ubpr_metrics' || job.report_type === 'market_intel') {
         return new Response(
           JSON.stringify({
             success: true,
@@ -227,6 +227,59 @@ Deno.serve(async (req) => {
           reportType: job.report_type,
           status: 'failed',
           error: errorMessage,
+          streamingUrl,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    if (job.report_type === 'market_intel') {
+      const parsedResult = parseJsonLikeResult(runData?.result);
+
+      if (!parsedResult) {
+        const errorMessage = 'TinyFish completed but did not return market intel data';
+        await supabase
+          .from('ffiec_report_jobs')
+          .update({
+            status: 'failed',
+            error_message: errorMessage,
+            tinyfish_streaming_url: streamingUrl,
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', job.id);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            jobId: job.id,
+            reportType: job.report_type,
+            status: 'failed',
+            error: errorMessage,
+            streamingUrl,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
+      await supabase
+        .from('ffiec_report_jobs')
+        .update({
+          status: 'completed',
+          source: 'live',
+          result_metrics: parsedResult,
+          tinyfish_streaming_url: streamingUrl,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', job.id);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          jobId: job.id,
+          reportType: job.report_type,
+          status: 'completed',
+          source: 'live',
+          data: parsedResult,
           streamingUrl,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
