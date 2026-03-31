@@ -3,9 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, ExternalLink, Loader2, AlertTriangle, Users } from "lucide-react";
 import { fetchUBPRPdf } from "@/lib/api/ubprPdf";
-import { fetchPeerGroupReport } from "@/lib/api/peerGroupReport";
 import { useToast } from "@/hooks/use-toast";
-import type { BankInfo } from "@/data/bankData";
 
 interface UBPRReportProps {
   bankName: string;
