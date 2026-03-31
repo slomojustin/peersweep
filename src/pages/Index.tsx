@@ -75,7 +75,7 @@ const Index = () => {
         {/* Dashboard Content */}
         <main className="container py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6 h-11">
+             <TabsList className="grid w-full grid-cols-5 h-11">
               <TabsTrigger value="ubpr" className="gap-2 text-xs">
                 <FileText className="h-3.5 w-3.5" />
                 FFIEC Reports
@@ -96,11 +96,7 @@ const Index = () => {
                 <Globe className="h-3.5 w-3.5" />
                 Market
               </TabsTrigger>
-              <TabsTrigger value="bulk" className="gap-2 text-xs">
-                <Database className="h-3.5 w-3.5" />
-                Bulk Data
-              </TabsTrigger>
-            </TabsList>
+             </TabsList>
 
             <TabsContent value="ubpr">
               <UBPRReport bankName={selectedBank.name} rssd={selectedBank.rssd} />
@@ -122,9 +118,6 @@ const Index = () => {
               <MarketResearch bank={selectedBank} peerBanks={peerBanks} />
             </TabsContent>
 
-            <TabsContent value="bulk">
-              <BulkDownloadPanel />
-            </TabsContent>
           </Tabs>
         </main>
       </div>
@@ -206,6 +199,10 @@ const Index = () => {
                 <p className="text-xs font-medium">{label}</p>
               </button>
             ))}
+          </div>
+
+          <div className="mt-10 animate-fade-in" style={{ animationDelay: "0.45s" }}>
+            <BulkDownloadPanel />
           </div>
         </div>
       </div>
