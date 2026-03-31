@@ -63,7 +63,7 @@ const PeerComparison = ({ subjectBank, subjectMetrics, peerBanks }: PeerComparis
             <TableHeader>
               <TableRow className="bg-primary/5">
                 <TableHead className="font-semibold">Metric</TableHead>
-                <TableHead className="text-right font-semibold">{subjectBank.name}</TableHead>
+                <TableHead className="text-right font-semibold bg-primary/10 border-x border-primary/20">{subjectBank.name}</TableHead>
                 {peerData.map(({ bank }) => (
                   <TableHead key={bank.rssd} className="text-right font-semibold text-xs">
                     {bank.name}
