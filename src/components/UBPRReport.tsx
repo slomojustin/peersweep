@@ -1,30 +1,21 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, ExternalLink, Loader2, AlertTriangle, Users } from "lucide-react";
+import { FileText, ExternalLink, Loader2, AlertTriangle } from "lucide-react";
 import { fetchUBPRPdf } from "@/lib/api/ubprPdf";
-import { fetchPeerGroupReport } from "@/lib/api/peerGroupReport";
 import { useToast } from "@/hooks/use-toast";
-import type { BankInfo } from "@/data/bankData";
 
 interface UBPRReportProps {
   bankName: string;
   rssd?: string;
-  peerBanks?: BankInfo[];
 }
 
-const UBPRReport = ({ bankName, rssd, peerBanks = [] }: UBPRReportProps) => {
+const UBPRReport = ({ bankName, rssd }: UBPRReportProps) => {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [ffiecUrl, setFfiecUrl] = useState<string | null>(null);
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [streamingUrl, setStreamingUrl] = useState<string | null>(null);
-
-  const [peerPdfUrl, setPeerPdfUrl] = useState<string | null>(null);
-  const [peerFfiecUrl, setPeerFfiecUrl] = useState<string | null>(null);
-  const [isLoadingPeer, setIsLoadingPeer] = useState(false);
-  const [peerError, setPeerError] = useState<string | null>(null);
-  const [peerStreamingUrl, setPeerStreamingUrl] = useState<string | null>(null);
 
   const { toast } = useToast();
 
@@ -50,34 +41,6 @@ const UBPRReport = ({ bankName, rssd, peerBanks = [] }: UBPRReportProps) => {
     } finally {
       setIsLoadingPdf(false);
       setStreamingUrl(null);
-    }
-  };
-
-  const handleFetchPeerReport = async () => {
-    if (!rssd || peerBanks.length === 0) return;
-    setIsLoadingPeer(true);
-    setPeerError(null);
-    setPeerStreamingUrl(null);
-
-    try {
-      const peerRssds = peerBanks.map(b => b.rssd);
-      const peerNames = peerBanks.map(b => b.name);
-      const result = await fetchPeerGroupReport(rssd, bankName, peerRssds, peerNames, (url) => setPeerStreamingUrl(url));
-
-      if (result.pdfUrl) {
-        setPeerPdfUrl(result.pdfUrl);
-        toast({ title: "Peer Group Report Loaded", description: `Custom Peer Group Report for ${bankName} retrieved successfully.` });
-      } else if (result.ffiecUrl) {
-        setPeerFfiecUrl(result.ffiecUrl);
-        setPeerError(result.message || "Could not auto-download the PDF.");
-      }
-    } catch (error) {
-      console.error("Failed to fetch Custom Peer Group Report:", error);
-      setPeerError("Could not retrieve the Custom Peer Group Report. You can access it directly from the FFIEC CDR.");
-      setPeerFfiecUrl("https://cdr.ffiec.gov/public/ManageFacsimiles.aspx");
-    } finally {
-      setIsLoadingPeer(false);
-      setPeerStreamingUrl(null);
     }
   };
 
@@ -109,31 +72,6 @@ const UBPRReport = ({ bankName, rssd, peerBanks = [] }: UBPRReportProps) => {
         <PdfViewer url={pdfUrl} title={`UBPR Report for ${bankName}`} label="FFIEC UBPR Facsimile" />
       )}
 
-      {/* Custom Peer Group Report Section */}
-      {!peerPdfUrl && (
-        <ReportCard
-          icon={<Users className="h-12 w-12 text-primary/60" />}
-          title="Custom Peer Group Report"
-          description={
-            peerBanks.length > 0
-              ? `Generate a Custom Peer Group report comparing ${bankName} against ${peerBanks.length} selected peer bank${peerBanks.length > 1 ? 's' : ''}.`
-              : "Select peer banks on the home screen to generate a Custom Peer Group Report."
-          }
-          buttonLabel="Retrieve Peer Group Report"
-          loadingLabel="Building peer group on FFIEC CDR…"
-          isLoading={isLoadingPeer}
-          disabled={!rssd || peerBanks.length === 0}
-          onFetch={handleFetchPeerReport}
-          streamingUrl={peerStreamingUrl}
-          error={peerError}
-          fallbackUrl={peerFfiecUrl}
-          peerBanks={peerBanks}
-        />
-      )}
-
-      {peerPdfUrl && (
-        <PdfViewer url={peerPdfUrl} title={`Custom Peer Group Report for ${bankName}`} label="Custom Peer Group Report" />
-      )}
     </div>
   );
 };
@@ -151,7 +89,6 @@ const ReportCard = ({
   streamingUrl,
   error,
   fallbackUrl,
-  peerBanks,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -164,7 +101,6 @@ const ReportCard = ({
   streamingUrl: string | null;
   error: string | null;
   fallbackUrl: string | null;
-  peerBanks?: BankInfo[];
 }) => (
   <Card className="p-6">
     <div className="flex flex-col items-center gap-4 text-center">
@@ -173,19 +109,6 @@ const ReportCard = ({
         <h4 className="font-semibold text-foreground">{title}</h4>
         <p className="text-sm text-muted-foreground mt-1">{description}</p>
       </div>
-
-      {peerBanks && peerBanks.length > 0 && (
-        <div className="w-full text-left bg-muted/30 rounded-lg p-3">
-          <p className="text-xs font-medium text-muted-foreground mb-1.5">Peer Banks:</p>
-          <div className="flex flex-wrap gap-1.5">
-            {peerBanks.map((bank) => (
-              <span key={bank.rssd} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                {bank.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
 
       <Button onClick={onFetch} disabled={isLoading || disabled} className="gap-2">
         {isLoading ? (
