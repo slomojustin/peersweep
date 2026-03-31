@@ -19,7 +19,6 @@ function parseXBRL(xmlContent: string): ParsedBank[] {
 
   const banks: Map<string, ParsedBank> = new Map();
 
-  // Extract context info to map context IDs to RSSD + date
   const contexts = doc.querySelectorAll('context');
   const contextMap: Map<string, { rssd: string; date: string }> = new Map();
 
@@ -38,7 +37,6 @@ function parseXBRL(xmlContent: string): ParsedBank[] {
     }
   }
 
-  // Parse all UBPR and source concept elements
   const allElements = doc.documentElement?.children || [];
   for (let i = 0; i < allElements.length; i++) {
     const el = allElements[i];
@@ -62,13 +60,8 @@ function parseXBRL(xmlContent: string): ParsedBank[] {
     }
 
     const bank = banks.get(key)!;
-
-    // Extract concept name from tag (e.g., "uc:UBPR4635" -> "UBPR4635", "cc:RCON2170" -> "RCON2170")
     const conceptName = tagName.includes(':') ? tagName.split(':')[1] : tagName;
-
     if (!conceptName) continue;
-
-    // Skip non-data elements
     if (['schemaRef', 'context', 'unit'].some(skip => tagName.includes(skip))) continue;
 
     const unitRef = el.getAttribute('unitRef') || '';
@@ -78,11 +71,60 @@ function parseXBRL(xmlContent: string): ParsedBank[] {
       if (!isNaN(num)) parsedValue = num;
     }
 
-    // Separate UBPR metrics from source concepts (RCON, RIAD)
     if (conceptName.startsWith('UBPR')) {
       bank.metrics[conceptName] = parsedValue;
     } else if (conceptName.startsWith('RCON') || conceptName.startsWith('RIAD')) {
       bank.sourceConcepts[conceptName] = parsedValue;
+    }
+  }
+
+  return Array.from(banks.values());
+}
+
+function parseTabDelimited(content: string): ParsedBank[] {
+  const lines = content.split('\n').filter(l => l.trim());
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split('\t').map(h => h.trim());
+  const rssdIdx = headers.findIndex(h => /rssd|idrssd|id_rssd/i.test(h));
+  const dateIdx = headers.findIndex(h => /date|repdte|report.*date/i.test(h));
+
+  if (rssdIdx === -1) {
+    console.error('Could not find RSSD column. Headers:', headers.slice(0, 20));
+    return [];
+  }
+
+  const banks: Map<string, ParsedBank> = new Map();
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split('\t');
+    const rssd = cols[rssdIdx]?.trim();
+    if (!rssd) continue;
+
+    const reportDate = dateIdx >= 0 ? cols[dateIdx]?.trim() || 'unknown' : 'unknown';
+    const key = `${rssd}_${reportDate}`;
+
+    if (!banks.has(key)) {
+      banks.set(key, { rssd, reportDate, metrics: {}, sourceConcepts: {} });
+    }
+
+    const bank = banks.get(key)!;
+    for (let j = 0; j < headers.length; j++) {
+      if (j === rssdIdx || j === dateIdx) continue;
+      const header = headers[j];
+      const val = cols[j]?.trim();
+      if (!header || !val || val === '') continue;
+
+      const num = parseFloat(val);
+      const parsedVal = isNaN(num) ? val : num;
+
+      if (header.startsWith('UBPR')) {
+        bank.metrics[header] = parsedVal;
+      } else if (header.startsWith('RCON') || header.startsWith('RIAD')) {
+        bank.sourceConcepts[header] = parsedVal;
+      } else {
+        bank.metrics[header] = parsedVal;
+      }
     }
   }
 
@@ -95,11 +137,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { downloadUrl, jobId } = await req.json();
+    const { downloadUrl, storagePath, jobId } = await req.json();
 
-    if (!downloadUrl) {
+    if (!downloadUrl && !storagePath) {
       return new Response(
-        JSON.stringify({ success: false, error: 'downloadUrl is required' }),
+        JSON.stringify({ success: false, error: 'downloadUrl or storagePath is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -108,33 +150,44 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log(`Downloading bulk UBPR from: ${downloadUrl}`);
+    let content: string;
 
-    // Download the file
-    const downloadResponse = await fetch(downloadUrl);
-    if (!downloadResponse.ok) {
-      throw new Error(`Failed to download: ${downloadResponse.status}`);
+    if (storagePath) {
+      console.log(`Reading from storage: ${storagePath}`);
+      const { data: fileData, error: dlError } = await supabase.storage
+        .from('ubpr-reports')
+        .download(storagePath);
+
+      if (dlError || !fileData) {
+        throw new Error(`Failed to download from storage: ${dlError?.message || 'no data'}`);
+      }
+      content = await fileData.text();
+    } else {
+      console.log(`Downloading from URL: ${downloadUrl}`);
+      const downloadResponse = await fetch(downloadUrl);
+      if (!downloadResponse.ok) {
+        throw new Error(`Failed to download: ${downloadResponse.status}`);
+      }
+      content = await downloadResponse.text();
     }
 
-    const contentType = downloadResponse.headers.get('content-type') || '';
-    const content = await downloadResponse.text();
+    console.log(`Content length: ${content.length} chars`);
 
-    console.log(`Downloaded content (${content.length} chars), type: ${contentType}`);
-
-    // Parse the XBRL content
-    // If it's a single XBRL file, parse directly
-    // If it's a zip, we'd need to handle that differently
     let allBanks: ParsedBank[] = [];
 
     if (content.includes('<?xml') || content.includes('<xbrl')) {
+      console.log('Detected XBRL format');
       allBanks = parseXBRL(content);
-      console.log(`Parsed ${allBanks.length} bank-period records from XBRL`);
+    } else if (content.includes('\t')) {
+      console.log('Detected tab-delimited format');
+      allBanks = parseTabDelimited(content);
     } else {
-      console.log('Content does not appear to be XBRL. First 500 chars:', content.substring(0, 500));
-      throw new Error('Downloaded content is not in XBRL format. It may be a zip file that needs different handling.');
+      console.log('Content format not recognized. First 500 chars:', content.substring(0, 500));
+      throw new Error('File format not recognized. Expected XBRL or tab-delimited.');
     }
 
-    // Batch upsert into ubpr_data
+    console.log(`Parsed ${allBanks.length} bank-period records`);
+
     let inserted = 0;
     let errors = 0;
     const batchSize = 50;
@@ -161,7 +214,6 @@ Deno.serve(async (req) => {
 
     console.log(`Bulk import complete: ${inserted} records inserted, ${errors} errors`);
 
-    // Update job status if jobId provided
     if (jobId) {
       await supabase
         .from('ffiec_report_jobs')
@@ -174,12 +226,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        totalRecords: allBanks.length,
-        inserted,
-        errors,
-      }),
+      JSON.stringify({ success: true, totalRecords: allBanks.length, inserted, errors }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {
