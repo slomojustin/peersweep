@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { type BankInfo, generateMockMetrics, generateNarrative } from "@/data/bankData";
 import { fetchUBPR } from "@/lib/api/ubpr";
 import BankSelector from "@/components/BankSelector";
@@ -21,6 +22,8 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [metrics, setMetrics] = useState<BankMetrics[]>([]);
   const [dataSource, setDataSource] = useState<"live" | "mock">("live");
+  const [analysisReady, setAnalysisReady] = useState(false);
+  const [activeTab, setActiveTab] = useState("ubpr");
   const { toast } = useToast();
 
   const selectedBank = subjectBank[0];
@@ -34,7 +37,7 @@ const Index = () => {
       const result = await fetchUBPR(selectedBank.rssd, selectedBank.name);
       setMetrics(result.metrics);
       setDataSource(result.source === "cache" ? "live" : "live");
-      setShowDashboard(true);
+      setAnalysisReady(true);
       toast({
         title: result.source === "cache" ? "Cached FFIEC Data Loaded" : "Live FFIEC Data Loaded",
         description: result.source === "cache" 
@@ -47,7 +50,7 @@ const Index = () => {
       const mockData = generateMockMetrics(selectedBank.rssd);
       setMetrics(mockData);
       setDataSource("mock");
-      setShowDashboard(true);
+      setAnalysisReady(true);
       toast({
         title: "Using Sample Data",
         description: "Could not reach FFIEC CDR. Showing estimated data.",
@@ -91,7 +94,7 @@ const Index = () => {
 
         {/* Dashboard Content */}
         <main className="container py-6">
-          <Tabs defaultValue="ubpr" className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-5 h-11">
               <TabsTrigger value="ubpr" className="gap-2 text-xs">
                 <BarChart3 className="h-3.5 w-3.5" />
@@ -192,15 +195,28 @@ const Index = () => {
 
           <div className="mt-12 grid grid-cols-4 gap-4 text-center animate-fade-in" style={{ animationDelay: "0.3s" }}>
             {[
-              { icon: BarChart3, label: "FFIEC Reports" },
-              { icon: Brain, label: "AI Narratives" },
-              { icon: Users, label: "Peer Analysis" },
-              { icon: Globe, label: "Market Intel" },
-            ].map(({ icon: Icon, label }) => (
-              <div key={label} className="p-3 rounded-lg bg-muted/50">
-                <Icon className="h-5 w-5 mx-auto mb-1.5 text-primary/70" />
-                <p className="text-xs text-muted-foreground font-medium">{label}</p>
-              </div>
+              { icon: BarChart3, label: "FFIEC Reports", tab: "ubpr" },
+              { icon: Brain, label: "AI Narratives", tab: "insights" },
+              { icon: Users, label: "Peer Analysis", tab: "peers" },
+              { icon: Globe, label: "Market Intel", tab: "market" },
+            ].map(({ icon: Icon, label, tab }) => (
+              <button
+                key={label}
+                disabled={!analysisReady}
+                onClick={() => {
+                  setActiveTab(tab);
+                  setShowDashboard(true);
+                }}
+                className={cn(
+                  "p-3 rounded-lg transition-all",
+                  analysisReady
+                    ? "bg-accent/15 border-2 border-accent text-accent cursor-pointer hover:bg-accent/25 hover:scale-105"
+                    : "bg-muted/50 text-muted-foreground cursor-default"
+                )}
+              >
+                <Icon className={cn("h-5 w-5 mx-auto mb-1.5", analysisReady ? "text-accent" : "text-primary/70")} />
+                <p className="text-xs font-medium">{label}</p>
+              </button>
             ))}
           </div>
         </div>
