@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
     }
 
     if (job.status === 'completed') {
-      if (job.report_type === 'ubpr_metrics') {
+      if (job.report_type === 'ubpr_metrics' || job.report_type === 'market_intel') {
         return new Response(
           JSON.stringify({
             success: true,
