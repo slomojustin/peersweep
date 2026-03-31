@@ -10,7 +10,7 @@ import DepositAnalysis from "@/components/DepositAnalysis";
 import MarketResearch from "@/components/MarketResearch";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Brain, Users, Landmark, Globe, ArrowRight, Loader2 } from "lucide-react";
+import { BarChart3, Brain, Users, Landmark, Globe, ArrowRight, Loader2, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { BankMetrics } from "@/data/bankData";
 
