@@ -119,7 +119,7 @@ const Index = () => {
             </TabsList>
 
             <TabsContent value="ubpr">
-              <UBPRReport bankName={selectedBank.name} metrics={metrics} />
+              <UBPRReport bankName={selectedBank.name} metrics={metrics} rssd={selectedBank.rssd} />
             </TabsContent>
 
             <TabsContent value="insights">
