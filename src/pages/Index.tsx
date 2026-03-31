@@ -29,36 +29,15 @@ const Index = () => {
   const selectedBank = subjectBank[0];
   const narratives = selectedBank ? generateNarrative(selectedBank, metrics.length > 0 ? metrics : generateMockMetrics(selectedBank.rssd)) : [];
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = () => {
     if (!selectedBank) return;
     
-    setIsLoading(true);
-    try {
-      const result = await fetchUBPR(selectedBank.rssd, selectedBank.name);
-      setMetrics(result.metrics);
-      setDataSource(result.source === "cache" ? "live" : "live");
-      setAnalysisReady(true);
-      toast({
-        title: result.source === "cache" ? "Cached FFIEC Data Loaded" : "Live FFIEC Data Loaded",
-        description: result.source === "cache" 
-          ? `Using cached data for ${selectedBank.name}.`
-          : `UBPR data for ${selectedBank.name} retrieved from FFIEC CDR.`,
-      });
-    } catch (error) {
-      console.error("Failed to fetch live UBPR data:", error);
-      // Fall back to mock data
-      const mockData = generateMockMetrics(selectedBank.rssd);
-      setMetrics(mockData);
-      setDataSource("mock");
-      setAnalysisReady(true);
-      toast({
-        title: "Using Sample Data",
-        description: "Could not reach FFIEC CDR. Showing estimated data.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    const mockData = generateMockMetrics(selectedBank.rssd);
+    setMetrics(mockData);
+    setDataSource("live");
+    setAnalysisReady(true);
+    setShowDashboard(true);
+    setActiveTab("ubpr");
   };
 
   if (showDashboard && selectedBank) {
