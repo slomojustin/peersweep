@@ -72,31 +72,6 @@ const UBPRReport = ({ bankName, rssd }: UBPRReportProps) => {
         <PdfViewer url={pdfUrl} title={`UBPR Report for ${bankName}`} label="FFIEC UBPR Facsimile" />
       )}
 
-      {/* Custom Peer Group Report Section */}
-      {!peerPdfUrl && (
-        <ReportCard
-          icon={<Users className="h-12 w-12 text-primary/60" />}
-          title="Custom Peer Group Report"
-          description={
-            peerBanks.length > 0
-              ? `Generate a Custom Peer Group report comparing ${bankName} against ${peerBanks.length} selected peer bank${peerBanks.length > 1 ? 's' : ''}.`
-              : "Select peer banks on the home screen to generate a Custom Peer Group Report."
-          }
-          buttonLabel="Retrieve Peer Group Report"
-          loadingLabel="Building peer group on FFIEC CDR…"
-          isLoading={isLoadingPeer}
-          disabled={!rssd || peerBanks.length === 0}
-          onFetch={handleFetchPeerReport}
-          streamingUrl={peerStreamingUrl}
-          error={peerError}
-          fallbackUrl={peerFfiecUrl}
-          peerBanks={peerBanks}
-        />
-      )}
-
-      {peerPdfUrl && (
-        <PdfViewer url={peerPdfUrl} title={`Custom Peer Group Report for ${bankName}`} label="Custom Peer Group Report" />
-      )}
     </div>
   );
 };
