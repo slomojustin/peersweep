@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Download, Loader2, AlertTriangle } from "lucide-react";
+import { Download, Loader2, AlertTriangle } from "lucide-react";
 import { fetchUBPRData } from "@/lib/api/ubprPdf";
 import { generateUBPRPdf } from "@/lib/generateUBPRPdf";
 import { useToast } from "@/hooks/use-toast";
@@ -17,24 +17,32 @@ const UBPRReport = ({ bankName, rssd }: UBPRReportProps) => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleGenerate = async () => {
+  useEffect(() => {
     if (!rssd) return;
-    setIsLoading(true);
-    setError(null);
+    let cancelled = false;
 
-    try {
-      const quarters = await fetchUBPRData(rssd);
-      const blob = await generateUBPRPdf(bankName, rssd, quarters);
-      const url = URL.createObjectURL(blob);
-      setPdfUrl(url);
-      toast({ title: "Report Generated", description: `UBPR PDF for ${bankName} is ready.` });
-    } catch (err) {
-      console.error("Failed to generate UBPR PDF:", err);
-      setError(err instanceof Error ? err.message : "Failed to generate UBPR report.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    const generate = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const quarters = await fetchUBPRData(rssd);
+        const blob = await generateUBPRPdf(bankName, rssd, quarters);
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url);
+        toast({ title: "Report Generated", description: `UBPR PDF for ${bankName} is ready.` });
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Failed to generate UBPR PDF:", err);
+        setError(err instanceof Error ? err.message : "Failed to generate UBPR report.");
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    generate();
+    return () => { cancelled = true; };
+  }, [rssd, bankName]);
 
   const handleDownload = () => {
     if (!pdfUrl) return;
@@ -51,37 +59,20 @@ const UBPRReport = ({ bankName, rssd }: UBPRReportProps) => {
         <p className="text-sm text-muted-foreground">{bankName} — Uniform Bank Performance Report</p>
       </div>
 
-      {!pdfUrl && (
+      {isLoading && (
         <Card className="p-6">
           <div className="flex flex-col items-center gap-4 text-center">
-            <FileText className="h-12 w-12 text-primary/60" />
-            <div>
-              <h4 className="font-semibold text-foreground">UBPR Facsimile Report</h4>
-              <p className="text-sm text-muted-foreground mt-1">
-                Generate a UBPR report from uploaded data showing the most recent 5 quarters.
-              </p>
-            </div>
+            <Loader2 className="h-10 w-10 text-primary animate-spin" />
+            <p className="text-sm text-muted-foreground">Generating UBPR report…</p>
+          </div>
+        </Card>
+      )}
 
-            <Button onClick={handleGenerate} disabled={isLoading || !rssd} className="gap-2">
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Generating report…
-                </>
-              ) : (
-                <>
-                  <FileText className="h-4 w-4" />
-                  Generate UBPR Report
-                </>
-              )}
-            </Button>
-
-            {error && (
-              <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-3 w-full">
-                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                <p className="text-left">{error}</p>
-              </div>
-            )}
+      {error && (
+        <Card className="p-6">
+          <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+            <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+            <p>{error}</p>
           </div>
         </Card>
       )}
