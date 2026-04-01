@@ -6,11 +6,11 @@ import BankSelector from "@/components/BankSelector";
 import UBPRReport from "@/components/UBPRReport";
 import AINarrativePanel from "@/components/AINarrativePanel";
 import PeerComparison from "@/components/PeerComparison";
-import DepositAnalysis from "@/components/DepositAnalysis";
+
 import MarketResearch from "@/components/MarketResearch";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Brain, Users, Landmark, Globe, FileText } from "lucide-react";
+import { BarChart3, Brain, Users, Globe, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { BankMetrics } from "@/data/bankData";
 
@@ -86,10 +86,6 @@ const Index = () => {
                 <Users className="h-3.5 w-3.5" />
                 Peer Analysis
               </TabsTrigger>
-              <TabsTrigger value="deposits" className="gap-2 text-xs">
-                <Landmark className="h-3.5 w-3.5" />
-                Deposits
-              </TabsTrigger>
               <TabsTrigger value="market" className="gap-2 text-xs">
                 <Globe className="h-3.5 w-3.5" />
                 Market
@@ -108,9 +104,6 @@ const Index = () => {
               <PeerComparison subjectBank={selectedBank} subjectMetrics={metrics} peerBanks={peerBanks} />
             </TabsContent>
 
-            <TabsContent value="deposits">
-              <DepositAnalysis bankName={selectedBank.name} metrics={metrics} />
-            </TabsContent>
 
             <TabsContent value="market">
               <MarketResearch bank={selectedBank} peerBanks={peerBanks} />
