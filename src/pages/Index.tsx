@@ -108,7 +108,7 @@ const Index = () => {
 
 
             <TabsContent value="market">
-              <MarketResearch bank={selectedBank} peerBanks={peerBanks} />
+              <MarketResearch bank={selectedBank} peerBanks={peerBanks} cachedData={marketIntelData} onDataLoaded={setMarketIntelData} />
             </TabsContent>
 
           </Tabs>
