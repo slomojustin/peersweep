@@ -67,6 +67,17 @@ interface MarketIntelResponse {
   data?: MarketIntelData;
 }
 
+function parseMarketIntelResult(raw: unknown): MarketIntelData {
+  if (!raw || typeof raw !== 'object') return raw as MarketIntelData;
+  const obj = raw as Record<string, unknown>;
+  if (obj.peerBankRates || obj.localNews || obj.socialMedia) return raw as MarketIntelData;
+  if (typeof obj.result === 'string') {
+    const cleaned = obj.result.replace(/^```json\s*/i, '').replace(/\s*```\s*$/, '');
+    try { return JSON.parse(cleaned) as MarketIntelData; } catch { /* fall through */ }
+  }
+  return raw as MarketIntelData;
+}
+
 export const fetchMarketIntel = async (
   bank: BankInfo,
   peerBanks: BankInfo[],

@@ -58,8 +58,9 @@ Deno.serve(async (req) => {
 
     if (existingJob?.result_metrics) {
       console.log(`Market intel cache hit for ${bankName}`);
+      const parsed = parseMarketIntelResult(existingJob.result_metrics);
       return new Response(
-        JSON.stringify({ success: true, source: 'cache', status: 'completed', data: existingJob.result_metrics }),
+        JSON.stringify({ success: true, source: 'cache', status: 'completed', data: parsed }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
