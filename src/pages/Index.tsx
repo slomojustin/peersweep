@@ -86,10 +86,6 @@ const Index = () => {
                 <Users className="h-3.5 w-3.5" />
                 Peer Analysis
               </TabsTrigger>
-              <TabsTrigger value="deposits" className="gap-2 text-xs">
-                <Landmark className="h-3.5 w-3.5" />
-                Deposits
-              </TabsTrigger>
               <TabsTrigger value="market" className="gap-2 text-xs">
                 <Globe className="h-3.5 w-3.5" />
                 Market
