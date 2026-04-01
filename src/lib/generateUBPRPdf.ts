@@ -135,5 +135,5 @@ export async function generateUBPRPdf(
     addFooter(i);
   }
 
-  return doc.output('blob');
+  return doc.output('datauristring');
 }
