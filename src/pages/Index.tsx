@@ -155,7 +155,7 @@ const Index = () => {
 
           </div>
 
-          <div className="mt-12 grid grid-cols-4 gap-4 text-center animate-fade-in" style={{ animationDelay: "0.3s" }}>
+          <div className="mt-8 grid grid-cols-4 gap-4 text-center animate-fade-in" style={{ animationDelay: "0.15s" }}>
             {[
               { icon: BarChart3, label: "Subject Bank\nFFIEC Report", tab: "ubpr" },
               { icon: Users, label: "Peer Group\nAnalysis", tab: "peers" },
@@ -164,19 +164,16 @@ const Index = () => {
             ].map(({ icon: Icon, label, tab }) => (
               <button
                 key={label}
-                disabled={!analysisReady}
-                onClick={() => {
-                  setActiveTab(tab);
-                  setShowDashboard(true);
-                }}
+                disabled={!selectedBank}
+                onClick={() => handleNavigate(tab)}
                 className={cn(
                   "p-3 rounded-lg transition-all",
-                  analysisReady
+                  selectedBank
                     ? "bg-accent/15 border-2 border-accent text-accent cursor-pointer hover:bg-accent/25 hover:scale-105"
                     : "bg-muted/50 text-muted-foreground cursor-default"
                 )}
               >
-                <Icon className={cn("h-5 w-5 mx-auto mb-1.5", analysisReady ? "text-accent" : "text-primary/70")} />
+                <Icon className={cn("h-5 w-5 mx-auto mb-1.5", selectedBank ? "text-accent" : "text-primary/70")} />
                 <p className="text-xs font-medium whitespace-pre-line">{label}</p>
               </button>
             ))}
