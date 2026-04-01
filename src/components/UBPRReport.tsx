@@ -26,10 +26,9 @@ const UBPRReport = ({ bankName, rssd }: UBPRReportProps) => {
       setError(null);
       try {
         const quarters = await fetchUBPRData(rssd);
-        const blob = await generateUBPRPdf(bankName, rssd, quarters);
+        const dataUri = await generateUBPRPdf(bankName, rssd, quarters);
         if (cancelled) return;
-        const url = URL.createObjectURL(blob);
-        setPdfUrl(url);
+        setPdfUrl(dataUri);
         toast({ title: "Report Generated", description: `UBPR PDF for ${bankName} is ready.` });
       } catch (err) {
         if (cancelled) return;
@@ -49,7 +48,9 @@ const UBPRReport = ({ bankName, rssd }: UBPRReportProps) => {
     const a = document.createElement("a");
     a.href = pdfUrl;
     a.download = `UBPR_${bankName.replace(/\s+/g, "_")}_${rssd}.pdf`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   };
 
   return (

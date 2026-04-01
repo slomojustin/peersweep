@@ -33,7 +33,7 @@ export async function generateUBPRPdf(
   bankName: string,
   rssd: string,
   quarters: QuarterData[],
-): Promise<Blob> {
+): Promise<string> {
   const sorted = [...quarters]
     .sort((a, b) => b.report_date.localeCompare(a.report_date))
     .slice(0, 5);
@@ -135,5 +135,5 @@ export async function generateUBPRPdf(
     addFooter(i);
   }
 
-  return doc.output('blob');
+  return doc.output('datauristring');
 }
