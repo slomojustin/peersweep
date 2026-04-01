@@ -27,6 +27,13 @@ Deno.serve(async (req) => {
   try {
     const { bankName, rssd, state, city, peerBanks } = await req.json();
 
+    // Build a deterministic peer key for cache matching
+    const peerRssds = ((peerBanks || []) as { rssd?: string }[])
+      .map(p => p.rssd)
+      .filter(Boolean)
+      .sort()
+      .join(',');
+
     if (!bankName || !rssd) {
       return new Response(
         JSON.stringify({ success: false, error: 'bankName and rssd are required' }),
@@ -60,12 +67,22 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (existingJob?.result_metrics) {
-      console.log(`Market intel cache hit for ${bankName}`);
-      const parsed = parseMarketIntelResult(existingJob.result_metrics);
-      return new Response(
-        JSON.stringify({ success: true, source: 'cache', status: 'completed', data: parsed }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+      // Compare stored peer RSSDs with current request
+      const metrics = existingJob.result_metrics as Record<string, unknown>;
+      const cachedPeers = Array.isArray(metrics._peerRssds)
+        ? (metrics._peerRssds as string[]).sort().join(',')
+        : '';
+      
+      if (cachedPeers === peerRssds) {
+        console.log(`Market intel cache hit for ${bankName}`);
+        const parsed = parseMarketIntelResult(existingJob.result_metrics);
+        return new Response(
+          JSON.stringify({ success: true, source: 'cache', status: 'completed', data: parsed }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      } else {
+        console.log(`Market intel cache miss: peer set changed for ${bankName}`);
+      }
     }
 
     // Check if there's already a processing job
