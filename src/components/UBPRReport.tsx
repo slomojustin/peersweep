@@ -48,7 +48,9 @@ const UBPRReport = ({ bankName, rssd }: UBPRReportProps) => {
     const a = document.createElement("a");
     a.href = pdfUrl;
     a.download = `UBPR_${bankName.replace(/\s+/g, "_")}_${rssd}.pdf`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   };
 
   return (
