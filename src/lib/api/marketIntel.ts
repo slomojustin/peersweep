@@ -108,7 +108,7 @@ export const fetchMarketIntel = async (
       throw new Error(finalJob.error || 'No market intel data returned');
     }
 
-    return finalJob.data as unknown as MarketIntelData;
+    return parseMarketIntelResult(finalJob.data);
   }
 
   throw new Error(data?.error || 'No market intel data returned');
