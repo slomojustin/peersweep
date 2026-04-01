@@ -1,53 +1,29 @@
 
 
-## Plan: Fix Market Intel Data Parsing
+## Plan: Fix Market Intel Cache to Include All Peer Banks
 
 ### Problem
-The `result_metrics` column in `ffiec_report_jobs` for market intel jobs stores data like:
-```json
-{ "result": "```json\n{ \"peerBankRates\": [...], ... }\n```" }
-```
-
-The edge function returns `existingJob.result_metrics` directly as `data`, but the client (`MarketResearch.tsx`) expects `data.peerBankRates`, `data.localNews`, `data.socialMedia` at the top level. The nested `result` key with markdown code fences means none of those properties exist.
+The market intel cache lookup in the edge function only matches on the subject bank's RSSD. It ignores which peer banks were selected. So if a previous run only included Capital One as a peer, that cached result keeps being returned even when the user now has 3 peer banks selected — the other two peers' data is never fetched.
 
 ### Fix
 
-**Update `supabase/functions/fetch-market-intel/index.ts`** — add a parsing step when returning cached data:
+**Update `supabase/functions/fetch-market-intel/index.ts`**:
 
-1. When returning from cache, extract `result_metrics.result`
-2. Strip the markdown code fences (`` ```json `` and `` ``` ``)
-3. Parse the inner JSON string
-4. Return the parsed object as `data`
+1. Generate a deterministic cache key from the sorted list of peer bank RSSDs (e.g., a comma-separated string or hash stored in a new column or compared against the stored job metadata).
+2. The simplest approach: skip the cache when the peer bank list doesn't match the cached job. To do this without schema changes, store the peer bank RSSDs in the `result_metrics` JSON alongside the data (e.g., `_peerRssds: ["123","456","789"]`), then compare on cache lookup.
+3. If the peer set differs from the cached result, bypass the cache and start a new TinyFish run.
 
-This same parsing should also be applied in the `process-bulk-ubpr` or `ffiec-job-status` path for when jobs complete via polling (the `pollFFIECJob` path).
+**Alternative simpler approach** (recommended): Add the peer RSSDs as a sorted comma-joined string and store it in a dedicated field. Since adding a column requires a migration, the pragmatic path is to embed the peer list inside `result_metrics` when saving the job, and check it on cache retrieval.
 
-**Also update `src/lib/api/marketIntel.ts`** — add a defensive parsing fallback on the client side:
+### Implementation Details
 
-1. After receiving `data.data`, check if it has a `result` key that's a string
-2. If so, strip code fences and parse it
-3. Return the cleaned object
-
-This ensures both cached and polled results work correctly.
+1. **On job creation** — include peer RSSDs in the job record by adding `_peerRssds` to the metadata or using an existing nullable text field.
+2. **On cache lookup** — after finding a cached job, extract the stored peer list and compare against the current request's peer list. If they differ, skip the cache hit and proceed to create a new job.
+3. **On `parseMarketIntelResult`** — strip the `_peerRssds` key before returning data to the client so it doesn't pollute the UI.
 
 ### Files Changed
-- `supabase/functions/fetch-market-intel/index.ts` — parse `result_metrics` before returning cache hit
-- `src/lib/api/marketIntel.ts` — add defensive client-side parsing
-
-### Technical Detail
-
-```typescript
-// Parsing helper for the edge function
-function parseMarketIntelResult(raw: any): any {
-  if (!raw) return raw;
-  if (raw.peerBankRates || raw.localNews || raw.socialMedia) return raw;
-  if (typeof raw.result === 'string') {
-    const cleaned = raw.result.replace(/^```json\s*/i, '').replace(/\s*```$/,'');
-    try { return JSON.parse(cleaned); } catch { return raw; }
-  }
-  return raw;
-}
-```
+- `supabase/functions/fetch-market-intel/index.ts` — store peer RSSDs with job, compare on cache lookup, bypass if mismatched
 
 ### Result
-Clicking "Current Market Intelligence" will display the peer bank rates table, local news cards, and social media activity — all the data that's already in the database.
+When the user selects different peer banks than a previous run, fresh market intel will be fetched for all selected peers instead of returning stale data that only covers one bank.
 
