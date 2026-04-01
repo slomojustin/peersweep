@@ -178,7 +178,7 @@ const Index = () => {
               { icon: BarChart3, label: "Subject Bank\nFFIEC Report", tab: "ubpr" },
               { icon: Users, label: "Peer Group\nAnalysis", tab: "peers" },
               { icon: Brain, label: "Detailed\nAnalysis", tab: "insights" },
-              { icon: Globe, label: "Market\nIntel", tab: "market" },
+              { icon: Globe, label: "Current Market\nIntelligence", tab: "market" },
             ].map(({ icon: Icon, label, tab }) => (
               <button
                 key={label}
