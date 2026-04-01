@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, Brain, Users, Globe, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { BankMetrics } from "@/data/bankData";
+import type { MarketIntelData } from "@/lib/api/marketIntel";
 
 
 const Index = () => {
@@ -24,6 +25,7 @@ const Index = () => {
   const [dataSource, setDataSource] = useState<"live" | "mock">("live");
   const [analysisReady, setAnalysisReady] = useState(false);
   const [activeTab, setActiveTab] = useState("ubpr");
+  const [marketIntelData, setMarketIntelData] = useState<MarketIntelData | null>(null);
   const { toast } = useToast();
 
   const selectedBank = subjectBank[0];
@@ -106,7 +108,7 @@ const Index = () => {
 
 
             <TabsContent value="market">
-              <MarketResearch bank={selectedBank} peerBanks={peerBanks} />
+              <MarketResearch bank={selectedBank} peerBanks={peerBanks} cachedData={marketIntelData} onDataLoaded={setMarketIntelData} />
             </TabsContent>
 
           </Tabs>
