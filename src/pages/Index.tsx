@@ -153,23 +153,6 @@ const Index = () => {
               maxSelections={25}
             />
 
-            <Button
-              className="w-full h-12 text-base gap-2"
-              onClick={handleAnalyze}
-              disabled={!selectedBank || isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Fetching FFIEC Data…
-                </>
-              ) : (
-                <>
-                  Analyze Performance
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </Button>
           </div>
 
           <div className="mt-12 grid grid-cols-4 gap-4 text-center animate-fade-in" style={{ animationDelay: "0.3s" }}>
