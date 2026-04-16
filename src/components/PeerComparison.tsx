@@ -13,6 +13,7 @@ interface PeerComparisonProps {
   subjectBank: BankInfo;
   subjectMetrics: BankMetrics[];
   peerBanks: BankInfo[];
+  selectedQuarters?: string[];
 }
 
 type MetricRow = {
@@ -32,8 +33,11 @@ const metricRows: MetricRow[] = [
   { label: "NPL Ratio (%)", getValue: m => m.nplRatio, higher: false },
 ];
 
-const PeerComparison = ({ subjectBank, subjectMetrics, peerBanks }: PeerComparisonProps) => {
-  const latest = subjectMetrics[0];
+const PeerComparison = ({ subjectBank, subjectMetrics, peerBanks, selectedQuarters }: PeerComparisonProps) => {
+  const latest =
+    (selectedQuarters && selectedQuarters.length > 0
+      ? subjectMetrics.find((m) => m.quarter === selectedQuarters[0])
+      : undefined) ?? subjectMetrics[0];
   const peerData = peerBanks.map(bank => ({
     bank,
     metrics: generateMockMetrics(bank.rssd)[0],
@@ -43,6 +47,19 @@ const PeerComparison = ({ subjectBank, subjectMetrics, peerBanks }: PeerComparis
     if (peerData.length === 0) return 0;
     return +(peerData.reduce((sum, p) => sum + fn(p.metrics), 0) / peerData.length).toFixed(2);
   };
+
+  if (!latest) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="border-b-2 border-primary pb-3">
+          <h3 className="font-display text-lg text-foreground">Peer Comparison</h3>
+        </div>
+        <Card className="p-8 text-center">
+          <p className="text-muted-foreground">No UBPR data loaded yet.</p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">

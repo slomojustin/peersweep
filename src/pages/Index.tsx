@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { type BankInfo, generateNarrative } from "@/data/bankData";
 import { fetchUBPR } from "@/lib/api/ubpr";
+import QuarterRangePicker, { generateAvailableQuarters } from "@/components/QuarterRangePicker";
 import BankSelector from "@/components/BankSelector";
 import UBPRReport from "@/components/UBPRReport";
 import AINarrativePanel from "@/components/AINarrativePanel";
@@ -25,23 +26,28 @@ const Index = () => {
   const [dataSource, setDataSource] = useState<"live" | "cache" | "mock" | null>(null);
   const [isUbprLoading, setIsUbprLoading] = useState(false);
   const [ubprError, setUbprError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [analysisReady, setAnalysisReady] = useState(false);
   const [activeTab, setActiveTab] = useState("ubpr");
   const [marketIntelData, setMarketIntelData] = useState<MarketIntelData | null>(null);
   const { toast } = useToast();
 
+  const availableQuarters = useMemo(() => generateAvailableQuarters(), []);
+  const [selectedQuarters, setSelectedQuarters] = useState<string[]>(() => generateAvailableQuarters().slice(0, 5));
+
   const selectedBank = subjectBank[0];
-  const narratives = selectedBank ? generateNarrative(selectedBank, metrics) : [];
+  const narratives = selectedBank && metrics.length >= 2 ? generateNarrative(selectedBank, metrics) : [];
 
   const handleNavigate = async (tab: string) => {
     if (!selectedBank) return;
 
     setActiveTab(tab);
     setUbprError(null);
+    setStatusMessage(null);
     setIsUbprLoading(true);
 
     try {
-      const result = await fetchUBPR(selectedBank.rssd, selectedBank.name);
+      const result = await fetchUBPR(selectedBank.rssd, selectedBank.name, setStatusMessage);
       setMetrics(result.metrics);
       setDataSource(result.source);
       setAnalysisReady(true);
@@ -54,6 +60,7 @@ const Index = () => {
       setShowDashboard(true);
     } finally {
       setIsUbprLoading(false);
+      setStatusMessage(null);
     }
   };
 
@@ -98,11 +105,11 @@ const Index = () => {
         <main className="container py-6">
           {isUbprLoading && (
             <div className="flex items-center justify-center py-16 text-muted-foreground text-sm gap-2">
-              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+              <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
-              Loading UBPR data…
+              {statusMessage ?? "Loading UBPR data…"}
             </div>
           )}
           {ubprError && !isUbprLoading && (
@@ -110,6 +117,15 @@ const Index = () => {
               {ubprError}
             </div>
           )}
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-muted-foreground">Showing data for selected quarters</p>
+            <QuarterRangePicker
+              value={selectedQuarters}
+              onChange={setSelectedQuarters}
+              availableQuarters={availableQuarters}
+            />
+          </div>
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
              <TabsList className="grid w-full grid-cols-4 h-11">
               <TabsTrigger value="ubpr" className="gap-2 text-xs">
@@ -131,7 +147,7 @@ const Index = () => {
              </TabsList>
 
             <TabsContent value="ubpr">
-              <UBPRReport bankName={selectedBank.name} rssd={selectedBank.rssd} />
+              <UBPRReport bankName={selectedBank.name} rssd={selectedBank.rssd} selectedQuarters={selectedQuarters} />
             </TabsContent>
 
             <TabsContent value="insights">
@@ -139,7 +155,7 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="peers">
-              <PeerComparison subjectBank={selectedBank} subjectMetrics={metrics} peerBanks={peerBanks} />
+              <PeerComparison subjectBank={selectedBank} subjectMetrics={metrics} peerBanks={peerBanks} selectedQuarters={selectedQuarters} />
             </TabsContent>
 
 

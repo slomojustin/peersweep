@@ -50,7 +50,7 @@ const mapQuartersToMetrics = (quarters: UBPRQuarter[]): BankMetrics[] =>
     allowanceRatio: Number(q.allowanceRatio) || 0,
   }));
 
-export const fetchUBPR = async (rssd: string, bankName: string): Promise<FetchUBPRResult> => {
+export const fetchUBPR = async (rssd: string, bankName: string, onStatusUpdate?: (message: string) => void): Promise<FetchUBPRResult> => {
   const { data, error } = await supabase.functions.invoke<UBPRResponse>('fetch-ubpr', {
     body: { rssd, bankName },
   });
@@ -68,7 +68,7 @@ export const fetchUBPR = async (rssd: string, bankName: string): Promise<FetchUB
   }
 
   if (data?.success && data?.status === 'processing' && data?.jobId) {
-    const finalJob = await pollFFIECJob(data.jobId);
+    const finalJob = await pollFFIECJob(data.jobId, undefined, onStatusUpdate);
 
     if (finalJob.status !== 'completed' || !finalJob.data?.quarters) {
       throw new Error(finalJob.error || 'No UBPR data returned');

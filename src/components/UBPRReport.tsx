@@ -10,9 +10,10 @@ import UBPRReportPreview from "./UBPRReportPreview";
 interface UBPRReportProps {
   bankName: string;
   rssd?: string;
+  selectedQuarters?: string[];
 }
 
-const UBPRReport = ({ bankName, rssd }: UBPRReportProps) => {
+const UBPRReport = ({ bankName, rssd, selectedQuarters }: UBPRReportProps) => {
   const [quarters, setQuarters] = useState<UBPRPdfData[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +98,7 @@ const UBPRReport = ({ bankName, rssd }: UBPRReportProps) => {
       )}
 
       {quarters && rssd && (
-        <UBPRReportPreview bankName={bankName} rssd={rssd} quarters={quarters} />
+        <UBPRReportPreview bankName={bankName} rssd={rssd} quarters={quarters} selectedQuarters={selectedQuarters} />
       )}
     </div>
   );

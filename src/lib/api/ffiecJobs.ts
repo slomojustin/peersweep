@@ -24,8 +24,14 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export const pollFFIECJob = async (
   jobId: string,
   onStreamingUrl?: (url: string) => void,
+  onStatusUpdate?: (message: string) => void,
 ): Promise<FFIECJobStatusResponse> => {
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt += 1) {
+    if (attempt === 0) onStatusUpdate?.("Connecting to FFIEC data source…");
+    else if (attempt === 1) onStatusUpdate?.("Fetching bank data — this takes 30–60 seconds for new banks…");
+    else if (attempt === 6) onStatusUpdate?.("Still working, FFIEC can be slow…");
+    else if (attempt === 12) onStatusUpdate?.("Almost there, finalizing data…");
+
     const { data, error } = await supabase.functions.invoke<FFIECJobStatusResponse>('ffiec-job-status', {
       body: { jobId },
     });
@@ -42,7 +48,13 @@ export const pollFFIECJob = async (
       onStreamingUrl(data.streamingUrl);
     }
 
-    if (data.status === 'completed' || data.status === 'failed') {
+    if (data.status === 'completed') {
+      onStatusUpdate?.("Data loaded successfully");
+      return data;
+    }
+
+    if (data.status === 'failed') {
+      onStatusUpdate?.(data.error || 'FFIEC retrieval failed');
       return data;
     }
 

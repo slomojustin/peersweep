@@ -13,6 +13,7 @@ interface Props {
   bankName: string;
   rssd: string;
   quarters: QuarterData[];
+  selectedQuarters?: string[];
 }
 
 function formatValue(raw: unknown, fmt: string): string {
@@ -33,10 +34,12 @@ function formatQuarterLabel(dateStr: string): string {
   return `${q} ${year}`;
 }
 
-const UBPRReportPreview = ({ bankName, rssd, quarters }: Props) => {
-  const sorted = [...quarters]
-    .sort((a, b) => b.report_date.localeCompare(a.report_date))
-    .slice(0, 5);
+const UBPRReportPreview = ({ bankName, rssd, quarters, selectedQuarters }: Props) => {
+  const allSorted = [...quarters].sort((a, b) => b.report_date.localeCompare(a.report_date));
+  const sorted =
+    selectedQuarters && selectedQuarters.length > 0
+      ? allSorted.filter((q) => selectedQuarters.includes(formatQuarterLabel(q.report_date)))
+      : allSorted.slice(0, 5);
 
   const quarterLabels = sorted.map((q) => formatQuarterLabel(q.report_date));
   const conceptsBySection = getConceptsBySection();
