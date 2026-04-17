@@ -1,4 +1,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  extractPeerRunIds,
+  parsePeerRunResult,
+  mergeMarketIntelResults,
+  hasUsableMarketIntelData,
+  type PeerRunResult,
+} from './market-intel-helpers.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -153,6 +160,138 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
+
+    // ── Multi-run market intel ────────────────────────────────────────────────
+    // When _runIds.peers is present, poll every peer-bank run and merge results.
+    // Falls through to the legacy single-run path when _runIds is absent.
+    if (job.report_type === 'market_intel') {
+      const peerRunIds = extractPeerRunIds(job.result_metrics);
+      if (peerRunIds && peerRunIds.length > 0) {
+        const apiKey = Deno.env.get('TINYFISH_API_KEY');
+        if (!apiKey) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'TinyFish API key not configured' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+
+        // Poll all peer runs concurrently
+        const runPolls = await Promise.all(
+          peerRunIds.map(async (runId) => {
+            const resp = await fetch(`https://agent.tinyfish.ai/v1/runs/${runId}`, {
+              headers: { 'X-API-Key': apiKey },
+            });
+            if (!resp.ok) {
+              console.error(`TinyFish status error for run ${runId}: ${resp.status}`);
+              return { runId, tinyfishStatus: 'ERROR', data: null as Record<string, unknown> | null };
+            }
+            const data = await resp.json() as Record<string, unknown>;
+            const tinyfishStatus = typeof data?.status === 'string' ? data.status.toUpperCase() : 'RUNNING';
+            return { runId, tinyfishStatus, data };
+          }),
+        );
+
+        const streamingUrls = runPolls
+          .map(r => (r.data && typeof r.data.streaming_url === 'string') ? r.data.streaming_url : null)
+          .filter((u): u is string => u !== null);
+
+        // At least one run still in progress — stay in processing
+        const stillRunning = runPolls.some(
+          r => r.tinyfishStatus === 'PENDING' || r.tinyfishStatus === 'RUNNING',
+        );
+        if (stillRunning) {
+          await supabase
+            .from('ffiec_report_jobs')
+            .update({ status: 'processing', tinyfish_streaming_url: streamingUrls[0] ?? null })
+            .eq('id', job.id);
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              jobId: job.id,
+              reportType: job.report_type,
+              status: 'processing',
+              source: job.source ?? 'live',
+              streamingUrl: streamingUrls[0] ?? null,
+              streamingUrls,
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+
+        // All terminal — collect usable results from completed runs
+        const successfulResults: PeerRunResult[] = [];
+        for (const r of runPolls) {
+          if (r.tinyfishStatus === 'COMPLETED' && r.data) {
+            const parsed = parsePeerRunResult(r.data);
+            if (parsed) {
+              successfulResults.push(parsed);
+            } else {
+              console.error(`Run ${r.runId} completed but returned no usable data`);
+            }
+          } else {
+            console.error(`Run ${r.runId} terminal with status ${r.tinyfishStatus}`);
+          }
+        }
+
+        const merged = mergeMarketIntelResults(successfulResults);
+
+        if (!hasUsableMarketIntelData(merged)) {
+          const errorMessage = `All ${peerRunIds.length} peer run(s) failed or returned no usable market intel data`;
+          await supabase
+            .from('ffiec_report_jobs')
+            .update({
+              status: 'failed',
+              error_message: errorMessage,
+              tinyfish_streaming_url: streamingUrls[0] ?? null,
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', job.id);
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              jobId: job.id,
+              reportType: job.report_type,
+              status: 'failed',
+              error: errorMessage,
+              streamingUrls,
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+
+        // Preserve existing metadata (_peerRssds, _runIds) alongside the merged results
+        const existingMeta = (job.result_metrics as Record<string, unknown>) ?? {};
+        const finalMetrics = { ...existingMeta, ...merged };
+
+        await supabase
+          .from('ffiec_report_jobs')
+          .update({
+            status: 'completed',
+            source: 'live',
+            result_metrics: finalMetrics,
+            tinyfish_streaming_url: streamingUrls[0] ?? null,
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', job.id);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            jobId: job.id,
+            reportType: job.report_type,
+            status: 'completed',
+            source: 'live',
+            data: merged,
+            streamingUrl: streamingUrls[0] ?? null,
+            streamingUrls,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+    // ── End multi-run market intel ────────────────────────────────────────────
 
     if (!job.tinyfish_run_id) {
       return new Response(

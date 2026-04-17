@@ -24,16 +24,16 @@ interface PeerBankInfo {
  */
 function buildPeerBankIntelGoal(subjectBank: SubjectBankInfo, peerBank: PeerBankInfo): string {
   const location = [peerBank.city, peerBank.state].filter(Boolean).join(', ');
-  return `Research "${peerBank.name}"${location ? ` (${location})` : ''} as a competitor to ${subjectBank.name}. Complete all three tasks below.
+  return `You are researching ONE specific bank: "${peerBank.name}"${location ? ` (${location})` : ''}. Complete all three tasks below. Every result must be about ${peerBank.name} only — do not include information about other banks or general market news.
 
 TASK 1 — Deposit Rates:
 Visit ${peerBank.name}'s official website and find their currently advertised deposit rates (savings, money market, CDs of all terms). Look for a "rates" or "personal banking" section.
 
-TASK 2 — Recent News:
-Search Google News for recent articles specifically about ${peerBank.name}. Look for:
-- Rate changes, new branch openings, or deposit promotions
-- Any press releases, earnings news, or community announcements
-- Local news coverage mentioning ${peerBank.name}
+TASK 2 — Recent News about ${peerBank.name}:
+Search Google News for recent articles specifically and only about ${peerBank.name}. Do not return articles about other banks or general industry news. Look for:
+- ${peerBank.name} rate changes, branch openings, or deposit promotions
+- ${peerBank.name} press releases, earnings news, or community announcements
+- Local news coverage that directly mentions ${peerBank.name} by name
 Extract up to 5 relevant articles.
 
 TASK 3 — Social Media & Marketing:
@@ -48,7 +48,7 @@ Return all results as a single JSON object with this exact structure:
     { "bankName": "${peerBank.name}", "product": "12-Month CD", "rate": 4.50, "source": "bankwebsite.com" }
   ],
   "localNews": [
-    { "headline": "Article title", "source": "Publication Name", "url": "https://...", "date": "2026-03-28", "summary": "Brief 1-2 sentence summary" }
+    { "bankName": "${peerBank.name}", "headline": "Article title", "source": "Publication Name", "url": "https://...", "date": "2026-03-28", "summary": "Brief 1-2 sentence summary" }
   ],
   "socialMedia": [
     { "bankName": "${peerBank.name}", "platform": "LinkedIn", "profileUrl": "https://...", "followers": 5000, "recentPromo": "...", "lastPostDate": "2026-03-25" }
