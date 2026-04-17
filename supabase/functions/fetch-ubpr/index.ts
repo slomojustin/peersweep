@@ -12,8 +12,26 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Method not allowed' }),
+      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+
   try {
-    const { rssd, bankName } = await req.json();
+    // Guard against malformed or empty body before touching fields
+    let rssd: string, bankName: string;
+    try {
+      const body = await req.json();
+      rssd = body.rssd;
+      bankName = body.bankName;
+    } catch {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid or missing JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
 
     if (!rssd) {
       return new Response(
@@ -69,9 +87,14 @@ Deno.serve(async (req) => {
 
     if (!tinyFishResponse.ok) {
       const errorText = await tinyFishResponse.text();
-      console.error('TinyFish async start error:', errorText);
+      console.error(`TinyFish async start error (HTTP ${tinyFishResponse.status}):`, errorText);
       return new Response(
-        JSON.stringify({ success: false, error: `TinyFish API error: ${tinyFishResponse.status}` }),
+        JSON.stringify({
+          success: false,
+          error: `TinyFish API error: ${tinyFishResponse.status}`,
+          // Include up to 300 chars of the upstream body to aid debugging
+          detail: errorText.slice(0, 300),
+        }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }

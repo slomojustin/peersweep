@@ -56,7 +56,13 @@ export const fetchUBPR = async (rssd: string, bankName: string, onStatusUpdate?:
   });
 
   if (error) {
-    throw new Error(`Failed to fetch UBPR: ${error.message}`);
+    // FunctionsHttpError carries the raw Response on .context — try to surface the server message
+    let message = error.message;
+    try {
+      const body = await (error as any).context?.json?.();
+      if (body?.error) message = body.error;
+    } catch { /* body not JSON or already consumed */ }
+    throw new Error(`Failed to fetch UBPR: ${message}`);
   }
 
   if (data?.success && data?.data?.quarters) {
