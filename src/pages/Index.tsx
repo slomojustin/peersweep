@@ -20,6 +20,7 @@ import type { MarketIntelData } from "@/lib/api/marketIntel";
 const Index = () => {
   const [subjectBank, setSubjectBank] = useState<BankInfo[]>([]);
   const [peerBanks, setPeerBanks] = useState<BankInfo[]>([]);
+  const [bypassPeerMin, setBypassPeerMin] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [metrics, setMetrics] = useState<BankMetrics[]>([]);
@@ -198,11 +199,21 @@ const Index = () => {
               multiple
               maxSelections={25}
             />
-            <p className={cn("text-xs mt-1", peerBanks.length >= 6 ? "text-green-600" : "text-yellow-600")}>
-              {peerBanks.length >= 6
-                ? `${peerBanks.length} peers selected ✓`
-                : `${peerBanks.length} of 6 minimum selected`}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className={cn("text-xs", peerBanks.length >= 6 || bypassPeerMin ? "text-green-600" : "text-yellow-600")}>
+                {peerBanks.length >= 6
+                  ? `${peerBanks.length} peers selected ✓`
+                  : bypassPeerMin
+                  ? `${peerBanks.length} peers selected (min bypassed)`
+                  : `${peerBanks.length} of 6 minimum selected`}
+              </p>
+              <button
+                onClick={() => setBypassPeerMin(b => !b)}
+                className="text-xs text-muted-foreground underline hover:text-foreground transition-colors"
+              >
+                {bypassPeerMin ? "re-enable min" : "bypass for testing"}
+              </button>
+            </div>
 
           </div>
 
@@ -215,16 +226,16 @@ const Index = () => {
             ].map(({ icon: Icon, label, tab }) => (
               <button
                 key={label}
-                disabled={!selectedBank || isUbprLoading || peerBanks.length < 6}
+                disabled={!selectedBank || isUbprLoading || peerBanks.length < 6 && !bypassPeerMin}
                 onClick={() => handleNavigate(tab)}
                 className={cn(
                   "p-3 rounded-lg transition-all",
-                  selectedBank && !isUbprLoading && peerBanks.length >= 6
+                  selectedBank && !isUbprLoading && (peerBanks.length >= 6 || bypassPeerMin)
                     ? "bg-accent/15 border-2 border-accent text-accent cursor-pointer hover:bg-accent/25 hover:scale-105"
                     : "bg-muted/50 text-muted-foreground cursor-default"
                 )}
               >
-                <Icon className={cn("h-5 w-5 mx-auto mb-1.5", selectedBank && !isUbprLoading && peerBanks.length >= 6 ? "text-accent" : "text-primary/70")} />
+                <Icon className={cn("h-5 w-5 mx-auto mb-1.5", selectedBank && !isUbprLoading && (peerBanks.length >= 6 || bypassPeerMin) ? "text-accent" : "text-primary/70")} />
                 <p className="text-xs font-medium whitespace-pre-line">{label}</p>
               </button>
             ))}
