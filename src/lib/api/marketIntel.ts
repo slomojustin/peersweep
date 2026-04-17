@@ -50,6 +50,11 @@ export interface SocialMediaEntry {
   lastPostDate: string | null;
 }
 
+export interface AgentStreamInfo {
+  bankName: string;
+  streamingUrl: string | null;
+}
+
 export interface MarketIntelData {
   competitorRates?: CompetitorRate[];
   fdicMarketShare?: FDICMarketShare | null;
@@ -82,6 +87,7 @@ export const fetchMarketIntel = async (
   bank: BankInfo,
   peerBanks: BankInfo[],
   onStreamingUrl?: (url: string) => void,
+  onAgentStreams?: (streams: AgentStreamInfo[]) => void,
 ): Promise<MarketIntelData> => {
   const { data, error } = await supabase.functions.invoke<MarketIntelResponse>('fetch-market-intel', {
     body: {
@@ -102,7 +108,16 @@ export const fetchMarketIntel = async (
   }
 
   if (data?.success && data?.status === 'processing' && data?.jobId) {
-    const finalJob = await pollFFIECJob(data.jobId, onStreamingUrl);
+    const finalJob = await pollFFIECJob(
+      data.jobId,
+      onStreamingUrl,
+      undefined,
+      onAgentStreams
+        ? (urls) => onAgentStreams(
+            peerBanks.map((p, i) => ({ bankName: p.name, streamingUrl: urls[i] ?? null })),
+          )
+        : undefined,
+    );
 
     if (finalJob.status !== 'completed' || !finalJob.data) {
       throw new Error(finalJob.error || 'No market intel data returned');

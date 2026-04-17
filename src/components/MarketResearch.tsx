@@ -9,9 +9,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Globe, ExternalLink, Loader2, Landmark, Newspaper, Share2 } from "lucide-react";
+import { Globe, ExternalLink, Loader2, Landmark, Newspaper, Share2, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { fetchMarketIntel, type MarketIntelData } from "@/lib/api/marketIntel";
+import { fetchMarketIntel, type MarketIntelData, type AgentStreamInfo } from "@/lib/api/marketIntel";
 import type { BankInfo } from "@/data/bankData";
 
 interface MarketResearchProps {
@@ -33,17 +34,94 @@ const TinyFishBadge = () => (
   </a>
 );
 
+const AgentStreamPanel = ({
+  stream,
+  index,
+  isExpanded,
+  onToggle,
+}: {
+  stream: AgentStreamInfo;
+  index: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) => {
+  const panelId = `agent-stream-${index}`;
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <button
+        aria-expanded={isExpanded}
+        aria-controls={panelId}
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-muted/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium truncate">{stream.bankName}</span>
+          <span className={cn(
+            "shrink-0 text-xs px-1.5 py-0.5 rounded-full font-medium",
+            stream.streamingUrl
+              ? "bg-blue-500/10 text-blue-600"
+              : "bg-muted text-muted-foreground",
+          )}>
+            {stream.streamingUrl ? "Running" : "Pending"}
+          </span>
+        </div>
+        <ChevronDown className={cn(
+          "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+          isExpanded && "rotate-180",
+        )} />
+      </button>
+      {isExpanded && (
+        <div id={panelId} className="px-3 py-2 border-t bg-muted/20">
+          {stream.streamingUrl ? (
+            <a
+              href={stream.streamingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Watch live extraction →
+            </a>
+          ) : (
+            <p className="text-xs text-muted-foreground">Waiting for agent to start…</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketResearchProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<MarketIntelData | null>(cachedData ?? null);
   const [streamingUrl, setStreamingUrl] = useState<string | null>(null);
+  const [agentStreams, setAgentStreams] = useState<AgentStreamInfo[]>([]);
+  const [expandedPanels, setExpandedPanels] = useState<Set<number>>(new Set());
   const { toast } = useToast();
+
+  const togglePanel = (i: number) =>
+    setExpandedPanels(prev => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i); else next.add(i);
+      return next;
+    });
+
+  const expandAll = () => setExpandedPanels(new Set(agentStreams.map((_, i) => i)));
+  const collapseAll = () => setExpandedPanels(new Set());
 
   const handleFetch = async () => {
     setIsLoading(true);
     setStreamingUrl(null);
+    setExpandedPanels(new Set());
+    // Initialise one panel per peer bank so they're visible from the start (all Pending)
+    setAgentStreams(peerBanks.map(p => ({ bankName: p.name, streamingUrl: null })));
     try {
-      const result = await fetchMarketIntel(bank, peerBanks, (url) => setStreamingUrl(url));
+      const result = await fetchMarketIntel(
+        bank,
+        peerBanks,
+        (url) => setStreamingUrl(url),
+        (streams) => setAgentStreams(streams),
+      );
       setData(result);
       onDataLoaded?.(result);
       toast({ title: "Market Intel Retrieved", description: "Live market data loaded successfully." });
@@ -53,6 +131,7 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
     } finally {
       setIsLoading(false);
       setStreamingUrl(null);
+      setAgentStreams([]);
     }
   };
 
@@ -92,26 +171,60 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
           </Card>
 
           {isLoading && (
-            <div className="space-y-2 px-1">
-              <div className="relative h-3 w-full rounded-full bg-muted overflow-visible">
-                <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-primary"
-                  style={{ animation: 'swim 90s ease-in-out forwards' }}
-                >
-                  <img
-                    src="/tinyfish-logo.png"
-                    alt="TinyFish extracting data"
-                    className="absolute right-0 top-1/2 h-7 w-7 object-contain -translate-y-1/2 translate-x-1/2"
-                  />
+            <div className="space-y-4 px-1">
+              {/* Overall progress bar */}
+              <div className="space-y-2">
+                <div className="relative h-3 w-full rounded-full bg-muted overflow-visible">
+                  <div
+                    className="absolute left-0 top-0 h-full rounded-full bg-primary"
+                    style={{ animation: 'swim 90s ease-in-out forwards' }}
+                  >
+                    <img
+                      src="/tinyfish-logo.png"
+                      alt="TinyFish extracting data"
+                      className="absolute right-0 top-1/2 h-7 w-7 object-contain -translate-y-1/2 translate-x-1/2"
+                    />
+                  </div>
                 </div>
-              </div>
-              <p className="text-xs text-muted-foreground text-center">TinyFish is extracting market data…</p>
-              {streamingUrl && (
                 <p className="text-xs text-muted-foreground text-center">
-                  <a href={streamingUrl} target="_blank" rel="noopener noreferrer" className="underline">
-                    Watch live extraction →
-                  </a>
+                  TinyFish is researching {agentStreams.length} peer bank{agentStreams.length !== 1 ? 's' : ''} in parallel…
                 </p>
+              </div>
+
+              {/* Per-agent stream panels */}
+              {agentStreams.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground font-medium">
+                      {agentStreams.filter(s => s.streamingUrl).length} of {agentStreams.length} agents running
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={expandAll}
+                        className="text-xs text-muted-foreground hover:text-foreground underline transition-colors"
+                      >
+                        Expand all
+                      </button>
+                      <button
+                        onClick={collapseAll}
+                        className="text-xs text-muted-foreground hover:text-foreground underline transition-colors"
+                      >
+                        Collapse all
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    {agentStreams.map((stream, i) => (
+                      <AgentStreamPanel
+                        key={i}
+                        stream={stream}
+                        index={i}
+                        isExpanded={expandedPanels.has(i)}
+                        onToggle={() => togglePanel(i)}
+                      />
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}

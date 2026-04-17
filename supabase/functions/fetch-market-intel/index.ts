@@ -78,6 +78,9 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // DEBUG — remove once deployment is confirmed
+    console.log('FETCH_MARKET_INTEL_VERSION=parallel-peer-v1');
+
     const { bankName, rssd, state, city, peerBanks } = await req.json();
 
     // Build a deterministic peer key for cache matching
@@ -175,6 +178,10 @@ Deno.serve(async (req) => {
       );
     }
 
+    // DEBUG — confirm parallel path and starting URL
+    console.log(`[parallel-peer-v1] peer banks: ${peerBankDetails.length} → ${peerBankDetails.map(p => p.name).join(', ')}`);
+    console.log(`[parallel-peer-v1] run count: ${runRequests.length} (one per peer, NOT combined)`);
+    console.log(`[parallel-peer-v1] TinyFish starting URL: https://www.google.com`);
     console.log(`Starting ${runRequests.length} parallel peer-bank TinyFish runs for ${bankName}...`);
 
     // Fire all runs concurrently
@@ -244,7 +251,14 @@ Deno.serve(async (req) => {
     console.log(`Started ${peerRunIds.length} peer market intel runs for ${bankName}, job ${job.id}`, { peerRunIds });
 
     return new Response(
-      JSON.stringify({ success: true, source: 'live', status: 'processing', jobId: job.id }),
+      JSON.stringify({
+        success: true,
+        source: 'live',
+        status: 'processing',
+        jobId: job.id,
+        debugVersion: 'parallel-peer-v1', // DEBUG — remove after confirming deployment
+        debugRunCount: peerRunIds.length,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {

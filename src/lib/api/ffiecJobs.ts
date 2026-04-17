@@ -14,6 +14,8 @@ export interface FFIECJobStatusResponse {
   message?: string;
   error?: string;
   streamingUrl?: string | null;
+  // One entry per peer run, null for runs not yet streaming. Index matches peerBanks order.
+  streamingUrls?: (string | null)[];
 }
 
 const POLL_INTERVAL_MS = 5000;
@@ -25,6 +27,7 @@ export const pollFFIECJob = async (
   jobId: string,
   onStreamingUrl?: (url: string) => void,
   onStatusUpdate?: (message: string) => void,
+  onStreamingUrls?: (urls: (string | null)[]) => void,
 ): Promise<FFIECJobStatusResponse> => {
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt += 1) {
     if (attempt === 0) onStatusUpdate?.("Connecting to FFIEC data source…");
@@ -46,6 +49,9 @@ export const pollFFIECJob = async (
 
     if (data.streamingUrl && onStreamingUrl) {
       onStreamingUrl(data.streamingUrl);
+    }
+    if (data.streamingUrls && onStreamingUrls) {
+      onStreamingUrls(data.streamingUrls);
     }
 
     if (data.status === 'completed') {

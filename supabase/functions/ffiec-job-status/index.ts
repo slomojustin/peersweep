@@ -191,9 +191,9 @@ Deno.serve(async (req) => {
           }),
         );
 
+        // Preserve null slots so index i maps to peerRunIds[i] (and therefore peerBanks[i])
         const streamingUrls = runPolls
-          .map(r => (r.data && typeof r.data.streaming_url === 'string') ? r.data.streaming_url : null)
-          .filter((u): u is string => u !== null);
+          .map(r => (r.data && typeof r.data.streaming_url === 'string') ? r.data.streaming_url : null);
 
         // At least one run still in progress — stay in processing
         const stillRunning = runPolls.some(
