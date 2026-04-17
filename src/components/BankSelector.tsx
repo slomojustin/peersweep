@@ -38,7 +38,7 @@ const BankSelector = ({ label, description, selected, onSelect, multiple = false
   }, []);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return [];
+    if (!search.trim()) return allBanks.slice(0, MAX_RESULTS);
     const q = search.toLowerCase();
     const results: BankInfo[] = [];
     for (const bank of allBanks) {
@@ -63,7 +63,7 @@ const BankSelector = ({ label, description, selected, onSelect, multiple = false
       } else if (selected.length < maxSelections) {
         onSelect([...selected, bank]);
       }
-      setSearch("");
+      // Don't clear search — keep the list visible so the user can keep selecting
     } else {
       onSelect([bank]);
       setOpen(false);
@@ -111,8 +111,6 @@ const BankSelector = ({ label, description, selected, onSelect, multiple = false
           <ScrollArea className="h-[300px]">
             {loading ? (
               <p className="p-4 text-sm text-muted-foreground text-center">Loading banks...</p>
-            ) : search.trim() === "" ? (
-              <p className="p-4 text-sm text-muted-foreground text-center">Type to search 60,000+ banks...</p>
             ) : filtered.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground text-center">No bank found.</p>
             ) : (
@@ -137,7 +135,7 @@ const BankSelector = ({ label, description, selected, onSelect, multiple = false
                 ))}
                 {filtered.length >= MAX_RESULTS && (
                   <p className="p-2 text-xs text-muted-foreground text-center">
-                    Showing first {MAX_RESULTS} results. Refine your search...
+                    {search.trim() === "" ? `Showing first ${MAX_RESULTS} banks — type to search 60,000+` : `Showing first ${MAX_RESULTS} results — refine your search`}
                   </p>
                 )}
               </div>

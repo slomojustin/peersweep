@@ -28,8 +28,10 @@ export const pollFFIECJob = async (
   onStreamingUrl?: (url: string) => void,
   onStatusUpdate?: (message: string) => void,
   onStreamingUrls?: (urls: (string | null)[]) => void,
+  signal?: AbortSignal,
 ): Promise<FFIECJobStatusResponse> => {
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt += 1) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     if (attempt === 0) onStatusUpdate?.("Connecting to FFIEC data source…");
     else if (attempt === 1) onStatusUpdate?.("Fetching bank data — this takes 30–60 seconds for new banks…");
     else if (attempt === 6) onStatusUpdate?.("Still working, FFIEC can be slow…");
@@ -64,7 +66,14 @@ export const pollFFIECJob = async (
       return data;
     }
 
-    await delay(POLL_INTERVAL_MS);
+    await new Promise<void>((resolve, reject) => {
+      const t = setTimeout(resolve, POLL_INTERVAL_MS);
+      signal?.addEventListener(
+        'abort',
+        () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); },
+        { once: true },
+      );
+    });
   }
 
   throw new Error('FFIEC retrieval is taking longer than expected. Please try again.');

@@ -88,7 +88,9 @@ export const fetchMarketIntel = async (
   peerBanks: BankInfo[],
   onStreamingUrl?: (url: string) => void,
   onAgentStreams?: (streams: AgentStreamInfo[]) => void,
+  signal?: AbortSignal,
 ): Promise<MarketIntelData> => {
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   const { data, error } = await supabase.functions.invoke<MarketIntelResponse>('fetch-market-intel', {
     body: {
       bankName: bank.name,
@@ -117,6 +119,7 @@ export const fetchMarketIntel = async (
             peerBanks.map((p, i) => ({ bankName: p.name, streamingUrl: urls[i] ?? null })),
           )
         : undefined,
+      signal,
     );
 
     if (finalJob.status !== 'completed' || !finalJob.data) {

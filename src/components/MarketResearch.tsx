@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Globe, ExternalLink, Loader2, Landmark, Newspaper, Share2, ChevronDown } from "lucide-react";
+import { Globe, ExternalLink, Loader2, Landmark, Newspaper, Share2, ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { fetchMarketIntel, type MarketIntelData, type AgentStreamInfo } from "@/lib/api/marketIntel";
@@ -39,13 +39,23 @@ const AgentStreamPanel = ({
   index,
   isExpanded,
   onToggle,
+  onCancel,
 }: {
-  stream: AgentStreamInfo;
+  stream: AgentStreamInfo & { cancelled?: boolean };
   index: number;
   isExpanded: boolean;
   onToggle: () => void;
+  onCancel: () => void;
 }) => {
   const panelId = `agent-stream-${index}`;
+
+  const statusLabel =
+    stream.cancelled
+      ? { label: 'Cancelled', cls: 'bg-red-500/10 text-red-500' }
+      : stream.streamingUrl
+      ? { label: 'Running', cls: 'bg-blue-500/10 text-blue-600' }
+      : { label: 'Pending', cls: 'bg-muted text-muted-foreground' };
+
   return (
     <div className="border rounded-lg overflow-hidden">
       <button
@@ -54,36 +64,47 @@ const AgentStreamPanel = ({
         onClick={onToggle}
         className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-muted/50 transition-colors"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <span className="text-sm font-medium truncate">{stream.bankName}</span>
           <span className={cn(
-            "shrink-0 text-xs px-1.5 py-0.5 rounded-full font-medium",
-            stream.streamingUrl
-              ? "bg-blue-500/10 text-blue-600"
-              : "bg-muted text-muted-foreground",
+            'shrink-0 text-xs px-1.5 py-0.5 rounded-full font-medium',
+            statusLabel.cls,
           )}>
-            {stream.streamingUrl ? "Running" : "Pending"}
+            {statusLabel.label}
           </span>
         </div>
-        <ChevronDown className={cn(
-          "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
-          isExpanded && "rotate-180",
-        )} />
-      </button>
-      {isExpanded && (
-        <div id={panelId} className="px-3 py-2 border-t bg-muted/20">
-          {stream.streamingUrl ? (
-            <a
-              href={stream.streamingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+        <div className="flex items-center gap-2 shrink-0">
+          {!stream.cancelled && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onCancel(); }}
+              className="text-muted-foreground hover:text-red-500 transition-colors p-0.5 rounded"
+              aria-label={`Cancel extraction for ${stream.bankName}`}
             >
-              <ExternalLink className="h-3 w-3" />
-              Watch live extraction →
-            </a>
+              <X className="h-3 w-3" />
+            </button>
+          )}
+          <ChevronDown className={cn(
+            'h-3.5 w-3.5 text-muted-foreground transition-transform',
+            isExpanded && 'rotate-180',
+          )} />
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div id={panelId} className="border-t bg-muted/20">
+          {stream.cancelled ? (
+            <p className="px-3 py-2 text-xs text-red-500">Extraction cancelled.</p>
+          ) : stream.streamingUrl ? (
+            <iframe
+              src={stream.streamingUrl}
+              title={`Live extraction — ${stream.bankName}`}
+              className="w-full h-48 border-0"
+              sandbox="allow-scripts allow-same-origin"
+            />
           ) : (
-            <p className="text-xs text-muted-foreground">Waiting for agent to start…</p>
+            <p className="px-3 py-2 text-xs text-muted-foreground">
+              Waiting for agent to start…
+            </p>
           )}
         </div>
       )}
@@ -95,9 +116,10 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<MarketIntelData | null>(cachedData ?? null);
   const [streamingUrl, setStreamingUrl] = useState<string | null>(null);
-  const [agentStreams, setAgentStreams] = useState<AgentStreamInfo[]>([]);
+  const [agentStreams, setAgentStreams] = useState<(AgentStreamInfo & { cancelled?: boolean })[]>([]);
   const [expandedPanels, setExpandedPanels] = useState<Set<number>>(new Set());
   const { toast } = useToast();
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const togglePanel = (i: number) =>
     setExpandedPanels(prev => {
@@ -109,7 +131,22 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
   const expandAll = () => setExpandedPanels(new Set(agentStreams.map((_, i) => i)));
   const collapseAll = () => setExpandedPanels(new Set());
 
+  const handleCancelAll = () => {
+    abortControllerRef.current?.abort();
+    setIsLoading(false);
+    setAgentStreams([]);
+    setStreamingUrl(null);
+  };
+
+  const handleCancelOne = (index: number) => {
+    setAgentStreams(prev =>
+      prev.map((s, i) => i === index ? { ...s, cancelled: true, streamingUrl: null } : s)
+    );
+  };
+
   const handleFetch = async () => {
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsLoading(true);
     setStreamingUrl(null);
     setExpandedPanels(new Set());
@@ -211,6 +248,12 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
                       >
                         Collapse all
                       </button>
+                      <button
+                        onClick={handleCancelAll}
+                        className="text-xs text-red-500 hover:text-red-600 font-medium transition-colors"
+                      >
+                        Cancel all
+                      </button>
                     </div>
                   </div>
                   <div className="space-y-1.5">
@@ -221,6 +264,7 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
                         index={i}
                         isExpanded={expandedPanels.has(i)}
                         onToggle={() => togglePanel(i)}
+                        onCancel={() => handleCancelOne(i)}
                       />
                     ))}
                   </div>
