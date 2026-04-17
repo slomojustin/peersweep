@@ -42,6 +42,7 @@ const Index = () => {
     if (!selectedBank) return;
 
     setActiveTab(tab);
+    setShowDashboard(true);
     setUbprError(null);
     setStatusMessage(null);
     setIsUbprLoading(true);
@@ -51,13 +52,11 @@ const Index = () => {
       setMetrics(result.metrics);
       setDataSource(result.source);
       setAnalysisReady(true);
-      setShowDashboard(true);
     } catch (error) {
       console.error('UBPR fetch failed:', error);
       setUbprError(error instanceof Error ? error.message : 'Failed to load UBPR data');
       setMetrics([]);
       setDataSource('mock');
-      setShowDashboard(true);
     } finally {
       setIsUbprLoading(false);
       setStatusMessage(null);
