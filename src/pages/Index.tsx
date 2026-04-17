@@ -210,16 +210,16 @@ const Index = () => {
             ].map(({ icon: Icon, label, tab }) => (
               <button
                 key={label}
-                disabled={!selectedBank}
+                disabled={!selectedBank || isUbprLoading}
                 onClick={() => handleNavigate(tab)}
                 className={cn(
                   "p-3 rounded-lg transition-all",
-                  selectedBank
+                  selectedBank && !isUbprLoading
                     ? "bg-accent/15 border-2 border-accent text-accent cursor-pointer hover:bg-accent/25 hover:scale-105"
                     : "bg-muted/50 text-muted-foreground cursor-default"
                 )}
               >
-                <Icon className={cn("h-5 w-5 mx-auto mb-1.5", selectedBank ? "text-accent" : "text-primary/70")} />
+                <Icon className={cn("h-5 w-5 mx-auto mb-1.5", selectedBank && !isUbprLoading ? "text-accent" : "text-primary/70")} />
                 <p className="text-xs font-medium whitespace-pre-line">{label}</p>
               </button>
             ))}
