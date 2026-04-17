@@ -16,6 +16,15 @@ import { useToast } from "@/hooks/use-toast";
 import type { BankMetrics } from "@/data/bankData";
 import type { MarketIntelData } from "@/lib/api/marketIntel";
 
+// Hardcoded peer banks for quick testing — swap for any 6 banks you prefer
+const TEST_PEER_BANKS: BankInfo[] = [
+  { rssd: "852218",  name: "JPMORGAN CHASE BANK",    city: "Columbus",      state: "OH" },
+  { rssd: "480228",  name: "BANK OF AMERICA",         city: "Charlotte",     state: "NC" },
+  { rssd: "451965",  name: "WELLS FARGO BANK",        city: "Sioux Falls",   state: "SD" },
+  { rssd: "476810",  name: "CITIBANK",                city: "Sioux Falls",   state: "SD" },
+  { rssd: "504713",  name: "U.S. BANK",               city: "Cincinnati",    state: "OH" },
+  { rssd: "817824",  name: "PNC BANK",                city: "Wilmington",    state: "DE" },
+];
 
 const Index = () => {
   const [subjectBank, setSubjectBank] = useState<BankInfo[]>([]);
@@ -44,24 +53,25 @@ const Index = () => {
 
     setActiveTab(tab);
     setShowDashboard(true);
-    setUbprError(null);
-    setStatusMessage(null);
-    setIsUbprLoading(true);
 
-    try {
-      const result = await fetchUBPR(selectedBank.rssd, selectedBank.name, setStatusMessage);
-      setMetrics(result.metrics);
-      setDataSource(result.source);
-      setAnalysisReady(true);
-    } catch (error) {
-      console.error('UBPR fetch failed:', error);
-      setUbprError(error instanceof Error ? error.message : 'Failed to load UBPR data');
-      setMetrics([]);
-      setDataSource('mock');
-    } finally {
-      setIsUbprLoading(false);
-      setStatusMessage(null);
-    }
+    // TEMP: UBPR fetch disabled for testing — re-enable when needed
+    // setUbprError(null);
+    // setStatusMessage(null);
+    // setIsUbprLoading(true);
+    // try {
+    //   const result = await fetchUBPR(selectedBank.rssd, selectedBank.name, setStatusMessage);
+    //   setMetrics(result.metrics);
+    //   setDataSource(result.source);
+    //   setAnalysisReady(true);
+    // } catch (error) {
+    //   console.error('UBPR fetch failed:', error);
+    //   setUbprError(error instanceof Error ? error.message : 'Failed to load UBPR data');
+    //   setMetrics([]);
+    //   setDataSource('mock');
+    // } finally {
+    //   setIsUbprLoading(false);
+    //   setStatusMessage(null);
+    // }
   };
 
   if (showDashboard && selectedBank) {
@@ -207,6 +217,12 @@ const Index = () => {
                   ? `${peerBanks.length} peers selected (min bypassed)`
                   : `${peerBanks.length} of 6 minimum selected`}
               </p>
+              <button
+                onClick={() => setPeerBanks(TEST_PEER_BANKS)}
+                className="text-xs text-muted-foreground underline hover:text-foreground transition-colors"
+              >
+                load 6 test banks
+              </button>
               <button
                 onClick={() => setBypassPeerMin(b => !b)}
                 className="text-xs text-muted-foreground underline hover:text-foreground transition-colors"
