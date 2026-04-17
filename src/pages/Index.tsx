@@ -198,6 +198,11 @@ const Index = () => {
               multiple
               maxSelections={25}
             />
+            <p className={cn("text-xs mt-1", peerBanks.length >= 6 ? "text-green-600" : "text-yellow-600")}>
+              {peerBanks.length >= 6
+                ? `${peerBanks.length} peers selected ✓`
+                : `${peerBanks.length} of 6 minimum selected`}
+            </p>
 
           </div>
 
@@ -210,16 +215,16 @@ const Index = () => {
             ].map(({ icon: Icon, label, tab }) => (
               <button
                 key={label}
-                disabled={!selectedBank || isUbprLoading}
+                disabled={!selectedBank || isUbprLoading || peerBanks.length < 6}
                 onClick={() => handleNavigate(tab)}
                 className={cn(
                   "p-3 rounded-lg transition-all",
-                  selectedBank && !isUbprLoading
+                  selectedBank && !isUbprLoading && peerBanks.length >= 6
                     ? "bg-accent/15 border-2 border-accent text-accent cursor-pointer hover:bg-accent/25 hover:scale-105"
                     : "bg-muted/50 text-muted-foreground cursor-default"
                 )}
               >
-                <Icon className={cn("h-5 w-5 mx-auto mb-1.5", selectedBank && !isUbprLoading ? "text-accent" : "text-primary/70")} />
+                <Icon className={cn("h-5 w-5 mx-auto mb-1.5", selectedBank && !isUbprLoading && peerBanks.length >= 6 ? "text-accent" : "text-primary/70")} />
                 <p className="text-xs font-medium whitespace-pre-line">{label}</p>
               </button>
             ))}
