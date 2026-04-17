@@ -19,62 +19,42 @@ interface PeerBankInfo {
 }
 
 /**
- * Prompt for one peer bank: website deposit rates + social media presence.
- * Designed to run as a standalone TinyFish task per peer (prep for parallel agents).
+ * Full per-peer prompt: deposit rates + recent news about that bank + social media.
+ * Each TinyFish run covers exactly one peer bank and returns all three data types.
  */
 function buildPeerBankIntelGoal(subjectBank: SubjectBankInfo, peerBank: PeerBankInfo): string {
   const location = [peerBank.city, peerBank.state].filter(Boolean).join(', ');
-  return `Research "${peerBank.name}"${location ? ` (${location})` : ''} as a competitor to ${subjectBank.name}.
+  return `Research "${peerBank.name}"${location ? ` (${location})` : ''} as a competitor to ${subjectBank.name}. Complete all three tasks below.
 
-1. Visit ${peerBank.name}'s official website and find their currently advertised deposit rates (savings, money market, CDs of all terms). Look for a "rates" or "personal banking" section.
+TASK 1 — Deposit Rates:
+Visit ${peerBank.name}'s official website and find their currently advertised deposit rates (savings, money market, CDs of all terms). Look for a "rates" or "personal banking" section.
 
-2. Find ${peerBank.name}'s social media presence:
-   - LinkedIn: search "site:linkedin.com/company ${peerBank.name}" — note follower count and recent rate/promotion posts
-   - Facebook: search "site:facebook.com ${peerBank.name}" — note promoted rates or community engagement
-   - Instagram: search "site:instagram.com ${peerBank.name}" — note any marketing campaigns or promotions
+TASK 2 — Recent News:
+Search Google News for recent articles specifically about ${peerBank.name}. Look for:
+- Rate changes, new branch openings, or deposit promotions
+- Any press releases, earnings news, or community announcements
+- Local news coverage mentioning ${peerBank.name}
+Extract up to 5 relevant articles.
 
-Return JSON with this exact structure:
+TASK 3 — Social Media & Marketing:
+Find ${peerBank.name}'s social media presence:
+- LinkedIn: search "site:linkedin.com/company ${peerBank.name}" — note follower count and recent rate/promotion posts
+- Facebook: search "site:facebook.com ${peerBank.name}" — note promoted rates or community engagement
+- Instagram: search "site:instagram.com ${peerBank.name}" — note any marketing campaigns or promotions
+
+Return all results as a single JSON object with this exact structure:
 {
   "peerBankRates": [
     { "bankName": "${peerBank.name}", "product": "12-Month CD", "rate": 4.50, "source": "bankwebsite.com" }
+  ],
+  "localNews": [
+    { "headline": "Article title", "source": "Publication Name", "url": "https://...", "date": "2026-03-28", "summary": "Brief 1-2 sentence summary" }
   ],
   "socialMedia": [
     { "bankName": "${peerBank.name}", "platform": "LinkedIn", "profileUrl": "https://...", "followers": 5000, "recentPromo": "...", "lastPostDate": "2026-03-25" }
   ]
 }
-All rate values must be numbers (not strings). Use null for any field not found.`;
-}
-
-/**
- * Prompt for local banking news in the subject bank's market.
- * Designed to run as a standalone TinyFish task (prep for parallel agents).
- */
-function buildLocalNewsGoal(subjectBank: SubjectBankInfo): string {
-  const location = [subjectBank.city, subjectBank.state].filter(Boolean).join(', ');
-  const cityRef = subjectBank.city ?? 'local';
-  return `Search for recent banking news relevant to "${subjectBank.name}" (RSSD: ${subjectBank.rssd})${location ? ` in ${location}` : ''}.
-
-Search Google News and local sources for:
-- Banking, deposit rates, branch openings, and financial services news${location ? ` in the ${location} market area` : ''}
-- Articles mentioning ${subjectBank.name} or its local competitors
-- Rate changes, new branches, or banking promotions in the area
-- Local publications (e.g. "${cityRef} business journal", "${cityRef} times", regional news outlets)
-
-Extract up to 10 relevant articles.
-
-Return JSON with this exact structure:
-{
-  "localNews": [
-    {
-      "headline": "Article title",
-      "source": "Local Newspaper Name",
-      "url": "https://...",
-      "date": "2026-03-28",
-      "summary": "Brief 1-2 sentence summary of the article's relevance to local banking"
-    }
-  ]
-}
-If no articles are found, return { "localNews": [] }.`;
+All rate values must be numbers (not strings). Use null for missing scalar fields. Use empty arrays when no records are found.`;
 }
 
 function parseMarketIntelResult(raw: unknown): unknown {
@@ -83,6 +63,7 @@ function parseMarketIntelResult(raw: unknown): unknown {
   // Strip internal metadata before returning
   const cleaned = { ...obj };
   delete (cleaned as Record<string, unknown>)._peerRssds;
+  delete (cleaned as Record<string, unknown>)._runIds;
   if (cleaned.peerBankRates || cleaned.localNews || cleaned.socialMedia) return cleaned;
   if (typeof cleaned.result === 'string') {
     const stripped = (cleaned.result as string).replace(/^```json\s*/i, '').replace(/\s*```\s*$/,'');
@@ -180,14 +161,21 @@ Deno.serve(async (req) => {
       (p: { name: string; city?: string; state?: string }) => ({ name: p.name, city: p.city, state: p.state }),
     );
 
-    // One request descriptor per task: 1 news + up to 5 peer-bank runs
+    // One run per peer bank — each covers rates + news + social for that peer only
     interface RunRequest { label: string; goal: string; }
-    const runRequests: RunRequest[] = [
-      { label: 'news', goal: buildLocalNewsGoal(subjectBankInfo) },
-      ...peerBankDetails.map(p => ({ label: `peer:${p.name}`, goal: buildPeerBankIntelGoal(subjectBankInfo, p) })),
-    ];
+    const runRequests: RunRequest[] = peerBankDetails.map(p => ({
+      label: `peer:${p.name}`,
+      goal: buildPeerBankIntelGoal(subjectBankInfo, p),
+    }));
 
-    console.log(`Starting ${runRequests.length} parallel TinyFish runs for ${bankName}...`);
+    if (runRequests.length === 0) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'At least one peer bank is required for market intel' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    console.log(`Starting ${runRequests.length} parallel peer-bank TinyFish runs for ${bankName}...`);
 
     // Fire all runs concurrently
     const runResults = await Promise.all(
@@ -209,14 +197,13 @@ Deno.serve(async (req) => {
       }),
     );
 
-    const newsRunId = runResults.find(r => r.label === 'news')?.runId ?? null;
     const peerRunIds = runResults
-      .filter(r => r.label.startsWith('peer:') && r.runId)
+      .filter(r => r.runId)
       .map(r => r.runId as string);
 
-    if (!newsRunId && peerRunIds.length === 0) {
+    if (peerRunIds.length === 0) {
       return new Response(
-        JSON.stringify({ success: false, error: 'All TinyFish runs failed to start' }),
+        JSON.stringify({ success: false, error: 'All TinyFish peer runs failed to start' }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -235,12 +222,12 @@ Deno.serve(async (req) => {
         report_type: 'market_intel',
         status: 'processing',
         source: 'live',
-        // tinyfish_run_id holds the news run as a fallback so the existing poller guard doesn't fire.
-        // TODO: update ffiec-job-status to read _runIds from result_metrics and poll all 6 runs in parallel.
-        tinyfish_run_id: newsRunId,
+        // tinyfish_run_id holds the first peer run as a fallback so the existing poller guard doesn't fire.
+        // TODO: update ffiec-job-status to read _runIds.peers, poll all runs, and merge results before completing.
+        tinyfish_run_id: peerRunIds[0],
         result_metrics: {
           _peerRssds: peerRssdList,
-          _runIds: { news: newsRunId, peers: peerRunIds },
+          _runIds: { peers: peerRunIds },
         },
       })
       .select('id')
@@ -254,7 +241,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Started ${runRequests.length} market intel runs for ${bankName}, job ${job.id}`, { newsRunId, peerRunIds });
+    console.log(`Started ${peerRunIds.length} peer market intel runs for ${bankName}, job ${job.id}`, { peerRunIds });
 
     return new Response(
       JSON.stringify({ success: true, source: 'live', status: 'processing', jobId: job.id }),
