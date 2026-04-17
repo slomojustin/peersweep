@@ -117,3 +117,9 @@
     font-family: var(--font-body);
   }
 }
+
+@keyframes swim {
+  0%   { width: 0%; }
+  85%  { width: 85%; }
+  100% { width: 85%; }
+}

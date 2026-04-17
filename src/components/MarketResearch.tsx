@@ -21,6 +21,18 @@ interface MarketResearchProps {
   onDataLoaded?: (data: MarketIntelData) => void;
 }
 
+const TinyFishBadge = () => (
+  <a
+    href="https://tinyfish.ai"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="flex items-center gap-1.5 text-xs text-muted-foreground border rounded-full px-2 py-0.5 hover:text-foreground transition-colors"
+  >
+    <img src="/tinyfish-logo.png" alt="TinyFish" className="h-4 w-4 object-contain" />
+    Powered by TinyFish
+  </a>
+);
+
 const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketResearchProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<MarketIntelData | null>(cachedData ?? null);
@@ -47,40 +59,63 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="border-b-2 border-primary pb-3">
-        <div className="flex items-center gap-2">
-          <Globe className="h-5 w-5 text-primary" />
-          <h3 className="font-display text-lg text-foreground">Market Research</h3>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Globe className="h-5 w-5 text-primary" />
+            <h3 className="font-display text-lg text-foreground">Market Research</h3>
+          </div>
+          <TinyFishBadge />
         </div>
         <p className="text-sm text-muted-foreground">Competitive intelligence for {bank.name}</p>
       </div>
 
       {/* Fetch button */}
       {!data && (
-        <Card className="p-6 text-center space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Scrape peer bank websites for deposit rates, search local news coverage, and scan social media for competitor marketing activity.
-          </p>
-          <Button onClick={handleFetch} disabled={isLoading} className="gap-2">
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Gathering Market Intel…
-              </>
-            ) : (
-              <>
-                <Globe className="h-4 w-4" />
-                Retrieve Market Intel
-              </>
-            )}
-          </Button>
-          {streamingUrl && (
-            <p className="text-xs text-muted-foreground">
-              <a href={streamingUrl} target="_blank" rel="noopener noreferrer" className="underline">
-                Watch live extraction →
-              </a>
+        <div className="space-y-4">
+          <Card className="p-6 text-center space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Scrape peer bank websites for deposit rates, search local news coverage, and scan social media for competitor marketing activity.
             </p>
+            <Button onClick={handleFetch} disabled={isLoading} className="gap-2">
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Gathering Market Intel…
+                </>
+              ) : (
+                <>
+                  <Globe className="h-4 w-4" />
+                  Retrieve Market Intel
+                </>
+              )}
+            </Button>
+          </Card>
+
+          {isLoading && (
+            <div className="space-y-2 px-1">
+              <div className="relative h-3 w-full rounded-full bg-muted overflow-visible">
+                <div
+                  className="absolute left-0 top-0 h-full rounded-full bg-primary"
+                  style={{ animation: 'swim 90s ease-in-out forwards' }}
+                >
+                  <img
+                    src="/tinyfish-logo.png"
+                    alt="TinyFish extracting data"
+                    className="absolute right-0 top-1/2 h-7 w-7 object-contain -translate-y-1/2 translate-x-1/2"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">TinyFish is extracting market data…</p>
+              {streamingUrl && (
+                <p className="text-xs text-muted-foreground text-center">
+                  <a href={streamingUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                    Watch live extraction →
+                  </a>
+                </p>
+              )}
+            </div>
           )}
-        </Card>
+        </div>
       )}
 
       {/* Results */}
@@ -203,11 +238,14 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
           )}
 
           {/* Refresh */}
-          <div className="text-center pt-2">
+          <div className="text-center pt-2 space-y-3">
             <Button variant="outline" size="sm" onClick={handleFetch} disabled={isLoading} className="gap-2">
               {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Globe className="h-3 w-3" />}
               Refresh Market Intel
             </Button>
+            <div className="flex justify-center">
+              <TinyFishBadge />
+            </div>
           </div>
         </div>
       )}
