@@ -5,6 +5,78 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface SubjectBankInfo {
+  name: string;
+  rssd: string;
+  city?: string;
+  state?: string;
+}
+
+interface PeerBankInfo {
+  name: string;
+  city?: string;
+  state?: string;
+}
+
+/**
+ * Prompt for one peer bank: website deposit rates + social media presence.
+ * Designed to run as a standalone TinyFish task per peer (prep for parallel agents).
+ */
+function buildPeerBankIntelGoal(subjectBank: SubjectBankInfo, peerBank: PeerBankInfo): string {
+  const location = [peerBank.city, peerBank.state].filter(Boolean).join(', ');
+  return `Research "${peerBank.name}"${location ? ` (${location})` : ''} as a competitor to ${subjectBank.name}.
+
+1. Visit ${peerBank.name}'s official website and find their currently advertised deposit rates (savings, money market, CDs of all terms). Look for a "rates" or "personal banking" section.
+
+2. Find ${peerBank.name}'s social media presence:
+   - LinkedIn: search "site:linkedin.com/company ${peerBank.name}" — note follower count and recent rate/promotion posts
+   - Facebook: search "site:facebook.com ${peerBank.name}" — note promoted rates or community engagement
+   - Instagram: search "site:instagram.com ${peerBank.name}" — note any marketing campaigns or promotions
+
+Return JSON with this exact structure:
+{
+  "peerBankRates": [
+    { "bankName": "${peerBank.name}", "product": "12-Month CD", "rate": 4.50, "source": "bankwebsite.com" }
+  ],
+  "socialMedia": [
+    { "bankName": "${peerBank.name}", "platform": "LinkedIn", "profileUrl": "https://...", "followers": 5000, "recentPromo": "...", "lastPostDate": "2026-03-25" }
+  ]
+}
+All rate values must be numbers (not strings). Use null for any field not found.`;
+}
+
+/**
+ * Prompt for local banking news in the subject bank's market.
+ * Designed to run as a standalone TinyFish task (prep for parallel agents).
+ */
+function buildLocalNewsGoal(subjectBank: SubjectBankInfo): string {
+  const location = [subjectBank.city, subjectBank.state].filter(Boolean).join(', ');
+  const cityRef = subjectBank.city ?? 'local';
+  return `Search for recent banking news relevant to "${subjectBank.name}" (RSSD: ${subjectBank.rssd})${location ? ` in ${location}` : ''}.
+
+Search Google News and local sources for:
+- Banking, deposit rates, branch openings, and financial services news${location ? ` in the ${location} market area` : ''}
+- Articles mentioning ${subjectBank.name} or its local competitors
+- Rate changes, new branches, or banking promotions in the area
+- Local publications (e.g. "${cityRef} business journal", "${cityRef} times", regional news outlets)
+
+Extract up to 10 relevant articles.
+
+Return JSON with this exact structure:
+{
+  "localNews": [
+    {
+      "headline": "Article title",
+      "source": "Local Newspaper Name",
+      "url": "https://...",
+      "date": "2026-03-28",
+      "summary": "Brief 1-2 sentence summary of the article's relevance to local banking"
+    }
+  ]
+}
+If no articles are found, return { "localNews": [] }.`;
+}
+
 function parseMarketIntelResult(raw: unknown): unknown {
   if (!raw || typeof raw !== 'object') return raw;
   const obj = raw as Record<string, unknown>;
@@ -102,103 +174,49 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build the peer bank names list for the prompt
-    const peerBankDetails = (peerBanks || []).map((p: { name: string; city?: string; state?: string }) => ({
-      name: p.name,
-      location: [p.city, p.state].filter(Boolean).join(', '),
-    }));
-    const peerNamesList = peerBankDetails.map(p => p.name).join(', ');
-    const peerDetailsForPrompt = peerBankDetails
-      .map(p => `  - ${p.name}${p.location ? ` (${p.location})` : ''}`)
-      .join('\n');
-    const location = [city, state].filter(Boolean).join(', ');
+    const subjectBankInfo: SubjectBankInfo = { name: bankName, rssd, city, state };
 
-    const goal = `I need comprehensive market intelligence for "${bankName}" (RSSD: ${rssd}) located in ${location || 'the United States'}.
+    const peerBankDetails: PeerBankInfo[] = (peerBanks || []).map(
+      (p: { name: string; city?: string; state?: string }) => ({ name: p.name, city: p.city, state: p.state }),
+    );
 
-TASK 1 — Peer Bank Website Rates:
-${peerNamesList ? `Visit the official websites of these peer banks and extract their currently advertised deposit rates (savings, money market, CDs of all terms). For each bank, go to their website and look for a "rates" or "personal banking" page:
-${peerDetailsForPrompt}` : 'Skip this task — no peer banks were selected.'}
+    // One request descriptor per task: 1 news + up to 5 peer-bank runs
+    interface RunRequest { label: string; goal: string; }
+    const runRequests: RunRequest[] = [
+      { label: 'news', goal: buildLocalNewsGoal(subjectBankInfo) },
+      ...peerBankDetails.map(p => ({ label: `peer:${p.name}`, goal: buildPeerBankIntelGoal(subjectBankInfo, p) })),
+    ];
 
-TASK 2 — Local News & Market Coverage:
-${location ? `Search Google News for recent articles about banking, deposit rates, branch openings, and financial services in the ${location} market area. Look for:
-- Local newspaper articles (e.g. "${city} business journal", "${city} times", local news outlets)
-- Articles mentioning ${bankName} or its competitors
-- Any news about rate changes, new branches, or banking promotions in the area
-Extract up to 10 relevant articles.` : 'Skip — no location provided.'}
+    console.log(`Starting ${runRequests.length} parallel TinyFish runs for ${bankName}...`);
 
-TASK 3 — Social Media & Marketing:
-${peerNamesList ? `Search for the social media presence and recent marketing of these banks:
-${peerDetailsForPrompt}
-For each bank, check:
-- LinkedIn company page (search "site:linkedin.com/company [bank name]") — note follower count, recent posts about rates or promotions
-- Facebook page (search "site:facebook.com [bank name]") — note any promoted rates, community engagement
-- Instagram (search "site:instagram.com [bank name]") — note marketing campaigns or promotions
-Extract any deposit rate promotions, special offers, or marketing campaigns found.` : 'Skip — no peer banks selected.'}
-
-Return ALL results as a single JSON object with this exact structure:
-{
-  "peerBankRates": [
-    {
-      "bankName": "Peer Bank Name",
-      "product": "12-Month CD",
-      "rate": 4.50,
-      "source": "bankwebsite.com"
-    }
-  ],
-  "localNews": [
-    {
-      "headline": "Article title",
-      "source": "Local Newspaper Name",
-      "url": "https://...",
-      "date": "2026-03-28",
-      "summary": "Brief 1-2 sentence summary of the article's relevance to local banking"
-    }
-  ],
-  "socialMedia": [
-    {
-      "bankName": "Peer Bank Name",
-      "platform": "LinkedIn",
-      "profileUrl": "https://linkedin.com/company/...",
-      "followers": 5000,
-      "recentPromo": "Currently promoting 5.00% APY 12-month CD special",
-      "lastPostDate": "2026-03-25"
-    }
-  ]
-}
-
-All rate values must be numbers (not strings). If a field is not found, use null.`;
-
-    console.log(`Starting market intel TinyFish run for ${bankName}...`);
-
-    const tinyFishResponse = await fetch('https://agent.tinyfish.ai/v1/automation/run-async', {
-      method: 'POST',
-      headers: {
-        'X-API-Key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: 'https://www.bankrate.com/banking/savings/best-high-yield-savings-accounts-rates/',
-        goal,
-        browser_profile: 'lite',
+    // Fire all runs concurrently
+    const runResults = await Promise.all(
+      runRequests.map(async ({ label, goal }) => {
+        const resp = await fetch('https://agent.tinyfish.ai/v1/automation/run-async', {
+          method: 'POST',
+          headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: 'https://www.google.com', goal, browser_profile: 'lite' }),
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          console.error(`TinyFish error for ${label} (HTTP ${resp.status}):`, text.slice(0, 300));
+          return { label, runId: null as string | null };
+        }
+        const data = await resp.json();
+        const runId: string | null = data?.run_id ?? null;
+        if (!runId) console.error(`No run_id from TinyFish for ${label}:`, data);
+        return { label, runId };
       }),
-    });
+    );
 
-    if (!tinyFishResponse.ok) {
-      const errorText = await tinyFishResponse.text();
-      console.error('TinyFish error:', errorText);
+    const newsRunId = runResults.find(r => r.label === 'news')?.runId ?? null;
+    const peerRunIds = runResults
+      .filter(r => r.label.startsWith('peer:') && r.runId)
+      .map(r => r.runId as string);
+
+    if (!newsRunId && peerRunIds.length === 0) {
       return new Response(
-        JSON.stringify({ success: false, error: `TinyFish API error: ${tinyFishResponse.status}` }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
-
-    const tinyFishResult = await tinyFishResponse.json();
-    const runId = tinyFishResult?.run_id;
-
-    if (!runId) {
-      console.error('No run_id from TinyFish:', tinyFishResult);
-      return new Response(
-        JSON.stringify({ success: false, error: 'TinyFish did not return a run ID' }),
+        JSON.stringify({ success: false, error: 'All TinyFish runs failed to start' }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -217,8 +235,13 @@ All rate values must be numbers (not strings). If a field is not found, use null
         report_type: 'market_intel',
         status: 'processing',
         source: 'live',
-        tinyfish_run_id: runId,
-        result_metrics: { _peerRssds: peerRssdList },
+        // tinyfish_run_id holds the news run as a fallback so the existing poller guard doesn't fire.
+        // TODO: update ffiec-job-status to read _runIds from result_metrics and poll all 6 runs in parallel.
+        tinyfish_run_id: newsRunId,
+        result_metrics: {
+          _peerRssds: peerRssdList,
+          _runIds: { news: newsRunId, peers: peerRunIds },
+        },
       })
       .select('id')
       .single();
@@ -231,7 +254,7 @@ All rate values must be numbers (not strings). If a field is not found, use null
       );
     }
 
-    console.log(`Started market intel run ${runId} for ${bankName}, job ${job.id}`);
+    console.log(`Started ${runRequests.length} market intel runs for ${bankName}, job ${job.id}`, { newsRunId, peerRunIds });
 
     return new Response(
       JSON.stringify({ success: true, source: 'live', status: 'processing', jobId: job.id }),
