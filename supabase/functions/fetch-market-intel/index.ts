@@ -83,19 +83,20 @@ Deno.serve(async (req) => {
 
     const { bankName, rssd, state, city, peerBanks } = await req.json();
 
-    // Build a deterministic peer key for cache matching
-    const peerRssds = ((peerBanks || []) as { rssd?: string }[])
-      .map(p => p.rssd)
-      .filter(Boolean)
-      .sort()
-      .join(',');
-
     if (!bankName || !rssd) {
       return new Response(
         JSON.stringify({ success: false, error: 'bankName and rssd are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
+
+    // Deterministic cache key: "<subject_rssd>:<sorted_peer_rssds>"
+    const sortedPeerRssds = ((peerBanks || []) as { rssd?: string }[])
+      .map(p => p.rssd)
+      .filter(Boolean)
+      .sort()
+      .join(',');
+    const cacheKey = `${rssd}:${sortedPeerRssds}`;
 
     const apiKey = Deno.env.get('TINYFISH_API_KEY');
     if (!apiKey) {
@@ -109,43 +110,33 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check cache (7-day TTL for market intel)
-    const cacheExpiry = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    // Check cache: 24-hour TTL, keyed on subject RSSD + sorted peer RSSDs
+    const ttlExpiry = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: existingJob } = await supabase
       .from('ffiec_report_jobs')
       .select('id, status, result_metrics, completed_at')
-      .eq('rssd', rssd)
+      .eq('cache_key', cacheKey)
       .eq('report_type', 'market_intel')
       .eq('status', 'completed')
-      .gt('completed_at', cacheExpiry)
+      .gt('completed_at', ttlExpiry)
       .order('completed_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (existingJob?.result_metrics) {
-      // Compare stored peer RSSDs with current request
-      const metrics = existingJob.result_metrics as Record<string, unknown>;
-      const cachedPeers = Array.isArray(metrics._peerRssds)
-        ? (metrics._peerRssds as string[]).sort().join(',')
-        : '';
-      
-      if (cachedPeers === peerRssds) {
-        console.log(`Market intel cache hit for ${bankName}`);
-        const parsed = parseMarketIntelResult(existingJob.result_metrics);
-        return new Response(
-          JSON.stringify({ success: true, source: 'cache', status: 'completed', data: parsed }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-        );
-      } else {
-        console.log(`Market intel cache miss: peer set changed for ${bankName}`);
-      }
+      console.log(`Market intel cache hit for ${bankName} (key: ${cacheKey})`);
+      const parsed = parseMarketIntelResult(existingJob.result_metrics);
+      return new Response(
+        JSON.stringify({ success: true, source: 'cache', status: 'completed', data: parsed }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
-    // Check if there's already a processing job
+    // Check if there's already a processing job for this exact subject+peer combination
     const { data: pendingJob } = await supabase
       .from('ffiec_report_jobs')
       .select('id')
-      .eq('rssd', rssd)
+      .eq('cache_key', cacheKey)
       .eq('report_type', 'market_intel')
       .eq('status', 'processing')
       .limit(1)
@@ -229,6 +220,7 @@ Deno.serve(async (req) => {
         report_type: 'market_intel',
         status: 'processing',
         source: 'live',
+        cache_key: cacheKey,
         // tinyfish_run_id holds the first peer run as a fallback so the existing poller guard doesn't fire.
         // TODO: update ffiec-job-status to read _runIds.peers, poll all runs, and merge results before completing.
         tinyfish_run_id: peerRunIds[0],
@@ -256,6 +248,7 @@ Deno.serve(async (req) => {
         source: 'live',
         status: 'processing',
         jobId: job.id,
+        runIds: peerRunIds,
         debugVersion: 'parallel-peer-v1', // DEBUG — remove after confirming deployment
         debugRunCount: peerRunIds.length,
       }),

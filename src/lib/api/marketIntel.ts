@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { pollFFIECJob } from '@/lib/api/ffiecJobs';
+import { openAgentSSEConnections } from '@/lib/api/marketIntelSSE';
 import type { BankInfo } from '@/data/bankData';
 
 export interface CompetitorRate {
@@ -69,6 +70,7 @@ interface MarketIntelResponse {
   source?: 'cache' | 'live';
   status?: 'processing' | 'completed' | 'failed';
   jobId?: string;
+  runIds?: string[];
   data?: MarketIntelData;
 }
 
@@ -110,6 +112,41 @@ export const fetchMarketIntel = async (
   }
 
   if (data?.success && data?.status === 'processing' && data?.jobId) {
+    if (data.runIds && data.runIds.length > 0 && onAgentStreams) {
+      // Initialise streams with null URLs; SSE fills them in as events arrive
+      const streams: AgentStreamInfo[] = peerBanks.map(p => ({
+        bankName: p.name,
+        streamingUrl: null,
+      }));
+
+      const cleanup = openAgentSSEConnections(
+        data.runIds,
+        {
+          onStreamingUrl: (index, url) => {
+            streams[index] = { ...streams[index], streamingUrl: url };
+            onAgentStreams([...streams]);
+            // Fire legacy single-URL callback for backward compat
+            if (index === 0) onStreamingUrl?.(url);
+          },
+          onResult: (_index, _result) => {
+            // Individual results ignored here — polling handles the merge
+          },
+          onError: (index, message) => {
+            console.warn(
+              `Agent SSE error for peer[${index}] (${peerBanks[index]?.name}): ${message}`,
+            );
+          },
+          onAllComplete: () => {
+            cleanup();
+          },
+        },
+        signal,
+      );
+
+      // Ensure SSE connections are torn down if the caller aborts
+      signal?.addEventListener('abort', cleanup, { once: true });
+    }
+
     const finalJob = await pollFFIECJob(
       data.jobId,
       onStreamingUrl,
