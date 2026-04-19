@@ -74,33 +74,27 @@ const Index = () => {
     return (
       <div className="min-h-screen bg-background">
         {/* Dashboard Header */}
-        <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
+        <header className="border-b sticky top-0 z-10 bg-gradient-to-r from-primary/10 via-background to-accent/10 backdrop-blur-sm">
           <div className="container flex items-center justify-between h-14">
             <div className="flex items-center gap-2">
               <button onClick={() => setShowDashboard(false)} className="font-brand text-lg cursor-pointer hover:opacity-80 transition-opacity">
                 <span className="text-primary">Peer</span><span className="text-accent">Sweep</span>
               </button>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">
-                {selectedBank.name} | {selectedBank.rssd}
+            <div className="flex items-center gap-2">
+              <span className="text-xs bg-muted border rounded-full px-2.5 py-0.5 text-foreground font-semibold hidden sm:block">🏦 {selectedBank.name}</span>
+              {[selectedBank.city, selectedBank.state].filter(Boolean).length > 0 && (
+                <span className="text-xs bg-muted border rounded-full px-2.5 py-0.5 text-muted-foreground hidden md:block">
+                  📍 {[selectedBank.city, selectedBank.state].filter(Boolean).join(', ')}
+                </span>
+              )}
+              <span className="text-xs bg-muted border rounded-full px-2.5 py-0.5 text-muted-foreground hidden md:block">
+                RSSD {selectedBank.rssd}
               </span>
-              {isUbprLoading ? (
-                <span className="text-xs text-muted-foreground px-2 py-0.5">Loading data…</span>
-              ) : ubprError ? (
-                <span className="text-xs bg-red-500/10 text-red-600 px-2 py-0.5 rounded-full font-medium">
-                  {ubprError}
-                </span>
-              ) : (dataSource === "live" || dataSource === "cache") ? (
-                <span className="text-xs bg-green-500/10 text-green-600 px-2 py-0.5 rounded-full font-medium">
-                  Live FFIEC Data
-                </span>
-              ) : dataSource === "mock" ? (
-                <span className="text-xs bg-yellow-500/10 text-yellow-600 px-2 py-0.5 rounded-full font-medium">
-                  Sample Data
-                </span>
-              ) : null}
-              <Button variant="outline" size="sm" onClick={() => setShowDashboard(false)}>
+              <span className="text-xs bg-muted border rounded-full px-2.5 py-0.5 text-muted-foreground hidden md:block">
+                👥 {peerBanks.length} peers
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setShowDashboard(false)} className="ml-2">
                 Change Bank
               </Button>
             </div>
@@ -124,24 +118,39 @@ const Index = () => {
             </div>
           )}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-             <TabsList className="grid w-full grid-cols-4 h-11">
-              <TabsTrigger value="ubpr" className="gap-2 text-xs">
-                <FileText className="h-3.5 w-3.5" />
+            <TabsList className="grid w-full grid-cols-4 h-14 rounded-xl p-1 bg-muted/60 gap-1">
+              <TabsTrigger value="ubpr" className="gap-2 text-sm font-medium rounded-lg data-[state=active]:shadow-md data-[state=active]:bg-background transition-all">
+                <FileText className="h-4 w-4" />
                 FFIEC Reports
+                {isUbprLoading && (
+                  <span className="ml-1 h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                )}
+                {!isUbprLoading && metrics.length > 0 && (
+                  <span className="ml-1 h-2 w-2 rounded-full bg-green-500" />
+                )}
               </TabsTrigger>
-              <TabsTrigger value="insights" className="gap-2 text-xs">
-                <Brain className="h-3.5 w-3.5" />
+              <TabsTrigger value="insights" className="gap-2 text-sm font-medium rounded-lg data-[state=active]:shadow-md data-[state=active]:bg-background transition-all">
+                <Brain className="h-4 w-4" />
                 AI Insights
+                {analysisReady && (
+                  <span className="ml-1 h-2 w-2 rounded-full bg-green-500" />
+                )}
               </TabsTrigger>
-              <TabsTrigger value="peers" className="gap-2 text-xs">
-                <Users className="h-3.5 w-3.5" />
+              <TabsTrigger value="peers" className="gap-2 text-sm font-medium rounded-lg data-[state=active]:shadow-md data-[state=active]:bg-background transition-all">
+                <Users className="h-4 w-4" />
                 Peer Analysis
+                {metrics.length > 0 && (
+                  <span className="ml-1 h-2 w-2 rounded-full bg-green-500" />
+                )}
               </TabsTrigger>
-              <TabsTrigger value="market" className="gap-2 text-xs">
-                <Globe className="h-3.5 w-3.5" />
-                Market
+              <TabsTrigger value="market" className="gap-2 text-sm font-medium rounded-lg data-[state=active]:shadow-md data-[state=active]:bg-background transition-all">
+                <Globe className="h-4 w-4" />
+                Market Intel
+                {marketIntelData && (
+                  <span className="ml-1 h-2 w-2 rounded-full bg-green-500" />
+                )}
               </TabsTrigger>
-             </TabsList>
+            </TabsList>
 
             <TabsContent value="ubpr">
               <UBPRReport bankName={selectedBank.name} rssd={selectedBank.rssd} selectedQuarters={[]} />

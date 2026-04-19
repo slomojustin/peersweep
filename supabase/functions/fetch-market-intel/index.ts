@@ -34,7 +34,7 @@ Search Google News for recent articles specifically and only about ${peerBank.na
 - ${peerBank.name} rate changes, branch openings, or deposit promotions
 - ${peerBank.name} press releases, earnings news, or community announcements
 - Local news coverage that directly mentions ${peerBank.name} by name
-Extract up to 5 relevant articles.
+Extract up to 5 relevant articles. For each article, open the article page and read its content so you can write a thorough 4-5 sentence summary that explains: what happened, why it matters to the bank or its customers, any specific figures or dates mentioned, and the broader context or impact.
 
 TASK 3 — Social Media & Marketing:
 Find ${peerBank.name}'s social media presence:
@@ -48,7 +48,7 @@ Return all results as a single JSON object with this exact structure:
     { "bankName": "${peerBank.name}", "product": "12-Month CD", "rate": 4.50, "source": "bankwebsite.com" }
   ],
   "localNews": [
-    { "bankName": "${peerBank.name}", "headline": "Article title", "source": "Publication Name", "url": "https://...", "date": "2026-03-28", "summary": "Brief 1-2 sentence summary" }
+    { "bankName": "${peerBank.name}", "headline": "Article title", "source": "Publication Name", "url": "https://...", "date": "2026-03-28", "summary": "4-5 sentence summary covering what happened, why it matters, key figures or dates mentioned, and the broader impact on the bank or its customers." }
   ],
   "socialMedia": [
     { "bankName": "${peerBank.name}", "platform": "LinkedIn", "profileUrl": "https://...", "followers": 5000, "recentPromo": "...", "lastPostDate": "2026-03-25" }

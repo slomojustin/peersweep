@@ -55,91 +55,164 @@ const BankResultsView = ({ result, bankName }: { result: MarketIntelData; bankNa
   const social = result.socialMedia?.filter(s => s.bankName === bankName) ?? [];
 
   if (!rates.length && !news.length && !social.length) {
-    return <p className="px-3 py-3 text-xs text-muted-foreground">No data returned for this bank.</p>;
+    return <p className="px-4 py-4 text-sm text-muted-foreground italic">No data returned for this bank.</p>;
   }
 
+  const maxRate = rates.length ? Math.max(...rates.map(r => r.rate)) : 0;
+
   return (
-    <div className="px-3 py-3 space-y-4">
+    <div className="divide-y divide-border">
+
+      {/* ── Advertised Rates ── blue tint */}
       {rates.length > 0 && (
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5">
-            <Landmark className="h-3.5 w-3.5 text-accent" />
-            <span className="text-xs font-semibold">Advertised Rates</span>
+        <div className="bg-blue-50/60 px-4 py-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Landmark className="h-4 w-4 text-blue-600 shrink-0" />
+            <h4 className="text-sm font-bold text-blue-900 tracking-tight">Advertised Rates</h4>
+            <span className="text-xs text-blue-500">({rates.length} products)</span>
           </div>
-          <div className="rounded border overflow-hidden">
+          <div className="rounded-lg border border-blue-200 overflow-hidden shadow-sm">
             <Table>
               <TableHeader>
-                <TableRow className="bg-primary/5">
-                  <TableHead className="text-xs font-semibold h-7 py-1">Product</TableHead>
-                  <TableHead className="text-xs text-right font-semibold h-7 py-1">APY (%)</TableHead>
-                  <TableHead className="text-xs font-semibold h-7 py-1">Source</TableHead>
+                <TableRow className="bg-blue-100/80">
+                  <TableHead className="text-xs font-semibold text-blue-800 h-8 py-2 pl-3">Product</TableHead>
+                  <TableHead className="text-xs text-right font-semibold text-blue-800 h-8 py-2">APY</TableHead>
+                  <TableHead className="text-xs font-semibold text-blue-800 h-8 py-2 pr-3">Source</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rates.map((r, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="text-xs py-1.5">{r.product}</TableCell>
-                    <TableCell className="text-xs text-right tabular-nums font-semibold text-accent py-1.5">{r.rate}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground py-1.5">{r.source}</TableCell>
-                  </TableRow>
-                ))}
+                {rates.map((r, i) => {
+                  const isBest = r.rate === maxRate && maxRate > 0;
+                  const sourceUrl = r.source.startsWith('http') ? r.source : `https://${r.source}`;
+                  return (
+                    <TableRow
+                      key={i}
+                      onClick={() => window.open(sourceUrl, '_blank', 'noopener,noreferrer')}
+                      className={cn(
+                        'cursor-pointer transition-colors',
+                        isBest ? 'bg-accent/8 hover:bg-accent/15' : 'hover:bg-blue-100/60',
+                      )}
+                    >
+                      <TableCell className="text-sm text-foreground font-medium py-2.5 pl-3">
+                        <div className="flex items-center gap-2">
+                          {r.product}
+                          {isBest && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-accent text-white shrink-0">
+                              Best
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className={cn(
+                        'text-sm text-right tabular-nums font-bold py-2.5',
+                        isBest ? 'text-accent' : 'text-foreground',
+                      )}>
+                        {r.rate}%
+                      </TableCell>
+                      <TableCell className="py-2.5 pr-3">
+                        <span className="text-xs text-blue-600 flex items-center gap-1 font-medium group-hover:underline">
+                          {r.source}
+                          <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
         </div>
       )}
 
+      {/* ── Local News ── amber tint, whole card clickable */}
       {news.length > 0 && (
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5">
-            <Newspaper className="h-3.5 w-3.5 text-accent" />
-            <span className="text-xs font-semibold">Local News</span>
+        <div className="bg-amber-50/60 px-4 py-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Newspaper className="h-4 w-4 text-amber-600 shrink-0" />
+            <h4 className="text-sm font-bold text-amber-900 tracking-tight">Local News</h4>
+            <span className="text-xs text-amber-500">({news.length} articles)</span>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {news.map((item, i) => (
-              <div key={i} className="rounded border p-2 space-y-0.5">
-                <p className="text-xs font-medium leading-tight">
-                  {item.url ? (
-                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="hover:underline text-primary">
-                      {item.headline}
-                    </a>
-                  ) : item.headline}
-                </p>
-                <p className="text-xs text-muted-foreground">{item.summary}</p>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span>{item.source}</span>
-                  {item.date && <span>• {item.date}</span>}
+              item.url ? (
+                <a
+                  key={i}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-lg border border-amber-200 border-l-[3px] border-l-amber-500 bg-white/70 p-3 space-y-1.5 hover:bg-amber-50 hover:shadow-sm transition-all cursor-pointer group"
+                >
+                  <p className="text-sm font-semibold leading-snug text-amber-900 group-hover:text-amber-700">{item.headline}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{item.summary}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">{item.source}</span>
+                    {item.date && <span className="text-xs text-muted-foreground">{item.date}</span>}
+                    <ExternalLink className="h-3 w-3 text-amber-400 ml-auto shrink-0" />
+                  </div>
+                </a>
+              ) : (
+                <div key={i} className="rounded-lg border border-amber-200 border-l-[3px] border-l-amber-500 bg-white/70 p-3 space-y-1.5">
+                  <p className="text-sm font-semibold leading-snug text-amber-900">{item.headline}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{item.summary}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">{item.source}</span>
+                    {item.date && <span className="text-xs text-muted-foreground">{item.date}</span>}
+                  </div>
                 </div>
-              </div>
+              )
             ))}
           </div>
         </div>
       )}
 
+      {/* ── Social & Marketing ── violet tint, whole card clickable */}
       {social.length > 0 && (
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5">
-            <Share2 className="h-3.5 w-3.5 text-accent" />
-            <span className="text-xs font-semibold">Social & Marketing</span>
+        <div className="bg-violet-50/60 px-4 py-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Share2 className="h-4 w-4 text-violet-600 shrink-0" />
+            <h4 className="text-sm font-bold text-violet-900 tracking-tight">Social & Marketing</h4>
+            <span className="text-xs text-violet-400">({social.length} platforms)</span>
           </div>
-          <div className="space-y-1.5">
-            {social.map((s, i) => (
-              <div key={i} className="rounded border p-2 space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium">
-                    {s.profileUrl ? (
-                      <a href={s.profileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
-                        {s.platform} <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : s.platform}
-                  </span>
+          <div className="grid gap-2">
+            {social.map((s, i) => {
+              const inner = (
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-bold text-violet-800">{s.platform}</span>
+                      {s.profileUrl && <ExternalLink className="h-3 w-3 text-violet-400 shrink-0" />}
+                    </div>
+                    {s.recentPromo && (
+                      <p className="text-xs text-muted-foreground leading-relaxed">{s.recentPromo}</p>
+                    )}
+                    {s.lastPostDate && (
+                      <p className="text-xs text-violet-400">Last post: {s.lastPostDate}</p>
+                    )}
+                  </div>
                   {s.followers != null && (
-                    <span className="text-xs text-muted-foreground">{s.followers.toLocaleString()} followers</span>
+                    <div className="shrink-0 text-right">
+                      <p className="text-base font-bold text-violet-700 tabular-nums">{s.followers.toLocaleString()}</p>
+                      <p className="text-xs text-violet-400">followers</p>
+                    </div>
                   )}
                 </div>
-                {s.recentPromo && <p className="text-xs text-muted-foreground">{s.recentPromo}</p>}
-              </div>
-            ))}
+              );
+              return s.profileUrl ? (
+                <a
+                  key={i}
+                  href={s.profileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-lg border border-violet-200 bg-white/70 p-3 hover:bg-violet-50 hover:shadow-sm transition-all cursor-pointer"
+                >
+                  {inner}
+                </a>
+              ) : (
+                <div key={i} className="rounded-lg border border-violet-200 bg-white/70 p-3">
+                  {inner}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
