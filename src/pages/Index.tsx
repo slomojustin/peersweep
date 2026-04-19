@@ -1,8 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { type BankInfo, generateNarrative } from "@/data/bankData";
 import { fetchUBPR } from "@/lib/api/ubpr";
-import QuarterRangePicker, { generateAvailableQuarters } from "@/components/QuarterRangePicker";
 import BankSelector from "@/components/BankSelector";
 import UBPRReport from "@/components/UBPRReport";
 import AINarrativePanel from "@/components/AINarrativePanel";
@@ -41,9 +40,6 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("ubpr");
   const [marketIntelData, setMarketIntelData] = useState<MarketIntelData | null>(null);
   const { toast } = useToast();
-
-  const availableQuarters = useMemo(() => generateAvailableQuarters(), []);
-  const [selectedQuarters, setSelectedQuarters] = useState<string[]>(() => generateAvailableQuarters().slice(0, 5));
 
   const selectedBank = subjectBank[0];
   const narratives = selectedBank && metrics.length >= 2 ? generateNarrative(selectedBank, metrics) : [];
@@ -127,15 +123,6 @@ const Index = () => {
               {ubprError}
             </div>
           )}
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-muted-foreground">Showing data for selected quarters</p>
-            <QuarterRangePicker
-              value={selectedQuarters}
-              onChange={setSelectedQuarters}
-              availableQuarters={availableQuarters}
-            />
-          </div>
-
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
              <TabsList className="grid w-full grid-cols-4 h-11">
               <TabsTrigger value="ubpr" className="gap-2 text-xs">
@@ -157,7 +144,7 @@ const Index = () => {
              </TabsList>
 
             <TabsContent value="ubpr">
-              <UBPRReport bankName={selectedBank.name} rssd={selectedBank.rssd} selectedQuarters={selectedQuarters} />
+              <UBPRReport bankName={selectedBank.name} rssd={selectedBank.rssd} selectedQuarters={[]} />
             </TabsContent>
 
             <TabsContent value="insights">
@@ -165,7 +152,7 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="peers">
-              <PeerComparison subjectBank={selectedBank} subjectMetrics={metrics} peerBanks={peerBanks} selectedQuarters={selectedQuarters} />
+              <PeerComparison subjectBank={selectedBank} subjectMetrics={metrics} peerBanks={peerBanks} selectedQuarters={[]} />
             </TabsContent>
 
 

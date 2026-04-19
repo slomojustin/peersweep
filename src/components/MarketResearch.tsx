@@ -395,7 +395,7 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
   const [cachedResult, setCachedResult] = useState<MarketIntelData | null>(cachedData ?? null);
   const [agentStreams, setAgentStreams] = useState<AgentStreamEntry[]>([]);
   const [expandedPanels, setExpandedPanels] = useState<Set<number>>(new Set());
-  const [testMode, setTestMode] = useState(false);
+  const [agentCount, setAgentCount] = useState<number>(peerBanks.length);
   const { toast } = useToast();
   const abortControllerRef = useRef<AbortController | null>(null);
   const runIdsRef = useRef<string[]>([]);
@@ -436,7 +436,9 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
     setIsLoading(true);
     setCachedResult(null);
     setExpandedPanels(new Set());
-    const activePeers = testMode ? peerBanks.slice(0, 1) : peerBanks;
+    const count = Math.min(Math.max(1, agentCount), peerBanks.length);
+    const shuffled = [...peerBanks].sort(() => Math.random() - 0.5);
+    const activePeers = count >= peerBanks.length ? peerBanks : shuffled.slice(0, count);
     // Initialise all as pending
     setAgentStreams(activePeers.map(p => ({
       bankName: p.name,
@@ -516,16 +518,19 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
             <h3 className="font-display text-lg text-foreground">Market Research</h3>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setTestMode(m => !m)}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              title={testMode ? "Test mode: 1 agent only" : "Run all agents"}
-            >
-              <span>1-agent test</span>
-              <div className={`relative w-7 h-4 rounded-full transition-colors duration-200 ${testMode ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
-                <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${testMode ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
-              </div>
-            </button>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span>Agents:</span>
+              <input
+                type="number"
+                min={1}
+                max={peerBanks.length}
+                value={agentCount}
+                onChange={e => setAgentCount(Math.min(Math.max(1, parseInt(e.target.value) || 1), peerBanks.length))}
+                disabled={isLoading}
+                className="w-12 text-center text-xs font-medium border rounded-md px-1 py-0.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+              />
+              <span className="text-muted-foreground/60">/ {peerBanks.length}</span>
+            </div>
             <TinyFishBadge />
           </div>
         </div>

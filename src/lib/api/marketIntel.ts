@@ -167,6 +167,9 @@ export const fetchMarketIntel = async (
           )
         : undefined,
       signal,
+      onBankResult
+        ? (index, result) => onBankResult(index, result as MarketIntelData)
+        : undefined,
     );
 
     if (finalJob.status !== 'completed' || !finalJob.data) {

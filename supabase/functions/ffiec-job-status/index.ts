@@ -205,6 +205,16 @@ Deno.serve(async (req) => {
             .update({ status: 'processing', tinyfish_streaming_url: streamingUrls[0] ?? null })
             .eq('id', job.id);
 
+          // Collect results from already-completed runs for progressive client delivery
+          const perRunResults: { index: number; result: PeerRunResult }[] = [];
+          for (let i = 0; i < runPolls.length; i++) {
+            const r = runPolls[i];
+            if (r.tinyfishStatus === 'COMPLETED' && r.data) {
+              const parsed = parsePeerRunResult(r.data);
+              if (parsed) perRunResults.push({ index: i, result: parsed });
+            }
+          }
+
           return new Response(
             JSON.stringify({
               success: true,
@@ -214,6 +224,7 @@ Deno.serve(async (req) => {
               source: job.source ?? 'live',
               streamingUrl: streamingUrls[0] ?? null,
               streamingUrls,
+              perRunResults,
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
           );

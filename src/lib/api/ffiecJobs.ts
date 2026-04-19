@@ -29,7 +29,9 @@ export const pollFFIECJob = async (
   onStatusUpdate?: (message: string) => void,
   onStreamingUrls?: (urls: (string | null)[]) => void,
   signal?: AbortSignal,
+  onPerRunResult?: (index: number, result: unknown) => void,
 ): Promise<FFIECJobStatusResponse> => {
+  const reportedIndices = new Set<number>();
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt += 1) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     if (attempt === 0) onStatusUpdate?.("Connecting to FFIEC data source…");
@@ -54,6 +56,16 @@ export const pollFFIECJob = async (
     }
     if (data.streamingUrls && onStreamingUrls) {
       onStreamingUrls(data.streamingUrls);
+    }
+
+    // Fire per-run results as individual agents complete (deduplicated across poll cycles)
+    if (onPerRunResult && Array.isArray((data as any).perRunResults)) {
+      for (const item of (data as any).perRunResults as { index: number; result: unknown }[]) {
+        if (!reportedIndices.has(item.index)) {
+          reportedIndices.add(item.index);
+          onPerRunResult(item.index, item.result);
+        }
+      }
     }
 
     if (data.status === 'completed') {
