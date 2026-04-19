@@ -35,6 +35,7 @@ export interface PeerBankRate {
 }
 
 export interface LocalNewsItem {
+  bankName?: string;
   headline: string;
   source: string;
   url: string | null;
@@ -93,6 +94,7 @@ export const fetchMarketIntel = async (
   signal?: AbortSignal,
   onRunIds?: (runIds: string[]) => void,
   onJobId?: (jobId: string) => void,
+  onBankResult?: (index: number, data: MarketIntelData) => void,
 ): Promise<MarketIntelData> => {
   if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   const { data, error } = await supabase.functions.invoke<MarketIntelResponse>('fetch-market-intel', {
@@ -136,8 +138,8 @@ export const fetchMarketIntel = async (
             // Fire legacy single-URL callback for backward compat
             if (index === 0) onStreamingUrl?.(url);
           },
-          onResult: (_index, _result) => {
-            // Individual results ignored here — polling handles the merge
+          onResult: (index, result) => {
+            onBankResult?.(index, result);
           },
           onError: (index, message) => {
             console.warn(

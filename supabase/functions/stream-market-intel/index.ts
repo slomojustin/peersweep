@@ -62,7 +62,23 @@ Deno.serve(async (req) => {
     try {
       const reader = upstreamResp.body!.getReader();
       let buffer = '';
+      // Accumulate per-event state; dispatch on blank line (proper SSE spec)
       let currentEvent = '';
+      let currentDataLines: string[] = [];
+
+      const dispatch = async (): Promise<boolean> => {
+        if (!currentEvent || currentDataLines.length === 0) return false;
+        const data = currentDataLines.join('\n');
+        if (currentEvent === 'STREAMING_URL' || currentEvent === 'RESULT' || currentEvent === 'ERROR') {
+          await writer.write(encoder.encode(`event: ${currentEvent}\ndata: ${data}\n\n`));
+          if (currentEvent === 'RESULT' || currentEvent === 'ERROR') {
+            clearInterval(heartbeat);
+            await writer.close();
+            return true; // terminal
+          }
+        }
+        return false;
+      };
 
       while (true) {
         const { done, value } = await reader.read();
@@ -70,46 +86,35 @@ Deno.serve(async (req) => {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        // Keep the last (potentially incomplete) line in the buffer
         buffer = lines.pop() ?? '';
 
-        for (const line of lines) {
+        let terminal = false;
+        for (const rawLine of lines) {
+          const line = rawLine.replace(/\r$/, ''); // strip \r from \r\n line endings
+
           if (line.startsWith('event:')) {
             currentEvent = line.slice(6).trim();
           } else if (line.startsWith('data:')) {
-            if (currentEvent === 'STREAMING_URL' || currentEvent === 'RESULT' || currentEvent === 'ERROR') {
-              const chunk = `event: ${currentEvent}\ndata:${line.slice(5)}\n\n`;
-              await writer.write(encoder.encode(chunk));
-
-              if (currentEvent === 'RESULT' || currentEvent === 'ERROR') {
-                clearInterval(heartbeat);
-                await writer.close();
-                return;
-              }
-            }
-            // Reset after dispatch so bare data: lines without a named event are ignored
+            currentDataLines.push(line.slice(5).trimStart());
+          } else if (line.trim() === '') {
+            // Blank line = end of event block — dispatch accumulated event
+            terminal = await dispatch();
             currentEvent = '';
-          } else if (line === '') {
-            // Blank line boundary — reset current event accumulator
-            currentEvent = '';
+            currentDataLines = [];
+            if (terminal) break;
           }
+          // Ignore comment lines (starting with ':'), id:, retry:, etc.
         }
+        if (terminal) break;
       }
 
       clearInterval(heartbeat);
-      await writer.close();
+      try { await writer.close(); } catch { /* already closed */ }
     } catch (err) {
       clearInterval(heartbeat);
-      if (err instanceof Error && err.name === 'AbortError') {
-        // Client disconnected — expected, not an error
-        return;
-      }
+      if (err instanceof Error && err.name === 'AbortError') return;
       console.error(`[stream-market-intel] runId=${runId} stream error:`, err);
-      try {
-        await writer.abort(err);
-      } catch {
-        // writer may already be closed
-      }
+      try { await writer.abort(err); } catch { /* writer may already be closed */ }
     }
   })();
 

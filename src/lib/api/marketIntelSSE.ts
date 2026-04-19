@@ -60,8 +60,33 @@ export function openAgentSSEConnections(
       const decoder = new TextDecoder();
       const reader = response.body.getReader();
       let buffer = '';
+      // Accumulate per-event state; dispatch on blank line (proper SSE spec)
       let currentEvent = '';
+      let currentDataLines: string[] = [];
       let terminal = false;
+
+      const dispatch = (): boolean => {
+        if (!currentEvent || currentDataLines.length === 0) return false;
+        const dataStr = currentDataLines.join('\n');
+
+        if (currentEvent === 'STREAMING_URL') {
+          callbacks.onStreamingUrl(index, dataStr.trim());
+        } else if (currentEvent === 'RESULT') {
+          const cleaned = dataStr.replace(/^```json\s*/i, '').replace(/\s*```\s*$/, '').trim();
+          let parsed: MarketIntelData;
+          try {
+            parsed = JSON.parse(cleaned) as MarketIntelData;
+          } catch {
+            parsed = {} as MarketIntelData;
+          }
+          callbacks.onResult(index, parsed);
+          return true; // terminal
+        } else if (currentEvent === 'ERROR') {
+          callbacks.onError(index, dataStr.trim());
+          return true; // terminal
+        }
+        return false;
+      };
 
       try {
         while (true) {
@@ -72,40 +97,21 @@ export function openAgentSSEConnections(
           const lines = buffer.split('\n');
           buffer = lines.pop() ?? '';
 
-          for (const line of lines) {
+          for (const rawLine of lines) {
+            const line = rawLine.replace(/\r$/, '');
+
             if (line.startsWith(':')) {
               // SSE comment (heartbeat) — skip
-              continue;
             } else if (line.startsWith('event:')) {
               currentEvent = line.slice(6).trim();
             } else if (line.startsWith('data:')) {
-              const dataStr = line.slice(5).trim();
-
-              if (currentEvent === 'STREAMING_URL') {
-                callbacks.onStreamingUrl(index, dataStr);
-                currentEvent = '';
-              } else if (currentEvent === 'RESULT') {
-                const cleaned = dataStr.replace(/^```json\s*/i, '').replace(/\s*```\s*$/, '');
-                let parsed: MarketIntelData;
-                try {
-                  parsed = JSON.parse(cleaned) as MarketIntelData;
-                } catch {
-                  parsed = {} as MarketIntelData;
-                }
-                callbacks.onResult(index, parsed);
-                terminal = true;
-                currentEvent = '';
-                break;
-              } else if (currentEvent === 'ERROR') {
-                callbacks.onError(index, dataStr);
-                terminal = true;
-                currentEvent = '';
-                break;
-              } else {
-                currentEvent = '';
-              }
-            } else if (line === '') {
+              currentDataLines.push(line.slice(5).trimStart());
+            } else if (line.trim() === '') {
+              // Blank line = end of event block — dispatch
+              terminal = dispatch();
               currentEvent = '';
+              currentDataLines = [];
+              if (terminal) break;
             }
           }
 
