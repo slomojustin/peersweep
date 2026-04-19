@@ -92,6 +92,7 @@ export const fetchMarketIntel = async (
   onAgentStreams?: (streams: AgentStreamInfo[]) => void,
   signal?: AbortSignal,
   onRunIds?: (runIds: string[]) => void,
+  onJobId?: (jobId: string) => void,
 ): Promise<MarketIntelData> => {
   if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   const { data, error } = await supabase.functions.invoke<MarketIntelResponse>('fetch-market-intel', {
@@ -113,6 +114,8 @@ export const fetchMarketIntel = async (
   }
 
   if (data?.success && data?.status === 'processing' && data?.jobId) {
+    onJobId?.(data.jobId);
+
     if (data.runIds && data.runIds.length > 0) {
       onRunIds?.(data.runIds);
     }

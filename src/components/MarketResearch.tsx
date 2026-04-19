@@ -123,6 +123,7 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
   const { toast } = useToast();
   const abortControllerRef = useRef<AbortController | null>(null);
   const runIdsRef = useRef<string[]>([]);
+  const jobIdRef = useRef<string | null>(null);
 
   const togglePanel = (i: number) =>
     setExpandedPanels(prev => {
@@ -135,9 +136,10 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
   const collapseAll = () => setExpandedPanels(new Set());
 
   const handleCancelAll = () => {
-    cancelAgentRuns(runIdsRef.current);
+    cancelAgentRuns(runIdsRef.current, jobIdRef.current ?? undefined);
     abortControllerRef.current?.abort();
     runIdsRef.current = [];
+    jobIdRef.current = null;
     setIsLoading(false);
     setAgentStreams([]);
     setStreamingUrl(null);
@@ -166,6 +168,7 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
         (streams) => setAgentStreams(streams),
         controller.signal,
         (ids) => { runIdsRef.current = ids; },
+        (id) => { jobIdRef.current = id; },
       );
       setData(result);
       onDataLoaded?.(result);
@@ -175,6 +178,7 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
       toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to fetch market intel", variant: "destructive" });
     } finally {
       runIdsRef.current = [];
+      jobIdRef.current = null;
       setIsLoading(false);
       setStreamingUrl(null);
       setAgentStreams([]);
