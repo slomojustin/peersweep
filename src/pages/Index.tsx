@@ -39,6 +39,7 @@ const Index = () => {
   const [analysisReady, setAnalysisReady] = useState(false);
   const [activeTab, setActiveTab] = useState("ubpr");
   const [marketIntelData, setMarketIntelData] = useState<MarketIntelData | null>(null);
+  const [isMarketIntelLoading, setIsMarketIntelLoading] = useState(false);
   const { toast } = useToast();
 
   const selectedBank = subjectBank[0];
@@ -146,27 +147,29 @@ const Index = () => {
               <TabsTrigger value="market" className="gap-2 text-sm font-medium rounded-lg data-[state=active]:shadow-md data-[state=active]:bg-background transition-all">
                 <Globe className="h-4 w-4" />
                 Market Intel
-                {marketIntelData && (
+                {isMarketIntelLoading && (
+                  <span className="ml-1 h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                )}
+                {!isMarketIntelLoading && marketIntelData && (
                   <span className="ml-1 h-2 w-2 rounded-full bg-green-500" />
                 )}
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="ubpr">
+            <TabsContent value="ubpr" forceMount className="data-[state=inactive]:sr-only">
               <UBPRReport bankName={selectedBank.name} rssd={selectedBank.rssd} selectedQuarters={[]} />
             </TabsContent>
 
-            <TabsContent value="insights">
+            <TabsContent value="insights" forceMount className="data-[state=inactive]:sr-only">
               <AINarrativePanel narratives={narratives} bankName={selectedBank.name} metrics={metrics} />
             </TabsContent>
 
-            <TabsContent value="peers">
+            <TabsContent value="peers" forceMount className="data-[state=inactive]:sr-only">
               <PeerComparison subjectBank={selectedBank} subjectMetrics={metrics} peerBanks={peerBanks} selectedQuarters={[]} />
             </TabsContent>
 
-
-            <TabsContent value="market">
-              <MarketResearch bank={selectedBank} peerBanks={peerBanks} cachedData={marketIntelData} onDataLoaded={setMarketIntelData} />
+            <TabsContent value="market" forceMount className="data-[state=inactive]:sr-only">
+              <MarketResearch bank={selectedBank} peerBanks={peerBanks} cachedData={marketIntelData} onDataLoaded={setMarketIntelData} onLoadingChange={setIsMarketIntelLoading} />
             </TabsContent>
 
           </Tabs>

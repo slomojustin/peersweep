@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Globe, ExternalLink, Loader2, Landmark, Newspaper, Share2, ChevronDown, X, TrendingUp, ChevronsDown, ChevronsUp, XCircle } from "lucide-react";
+import { Globe, ExternalLink, Loader2, Landmark, Newspaper, Share2, ChevronDown, ChevronUp, X, TrendingUp, ChevronsDown, ChevronsUp, XCircle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { fetchMarketIntel, type MarketIntelData, type AgentStreamInfo } from "@/lib/api/marketIntel";
@@ -21,6 +21,7 @@ interface MarketResearchProps {
   peerBanks: BankInfo[];
   cachedData?: MarketIntelData | null;
   onDataLoaded?: (data: MarketIntelData) => void;
+  onLoadingChange?: (loading: boolean) => void;
 }
 
 type AgentStreamEntry = AgentStreamInfo & {
@@ -34,10 +35,13 @@ const TinyFishBadge = () => (
     href="https://tinyfish.ai"
     target="_blank"
     rel="noopener noreferrer"
-    className="flex items-center gap-1.5 text-xs text-muted-foreground border rounded-full px-2 py-0.5 hover:text-foreground transition-colors"
+    className="flex items-center gap-2 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl px-4 py-2 hover:from-orange-100 hover:to-amber-100 hover:border-orange-300 transition-all shadow-sm group"
   >
-    <img src="/tinyfish-logo.png" alt="TinyFish" className="h-4 w-4 object-contain" />
-    Powered by TinyFish
+    <img src="/tinyfish-logo.png" alt="TinyFish" className="h-7 w-7 object-contain group-hover:scale-110 transition-transform" />
+    <div className="flex flex-col leading-tight">
+      <span className="text-[10px] text-orange-400 font-medium uppercase tracking-widest">Powered by</span>
+      <span className="text-sm font-bold text-orange-600">TinyFish</span>
+    </div>
   </a>
 );
 
@@ -463,8 +467,9 @@ const FlatResultsView = ({
   </div>
 );
 
-const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketResearchProps) => {
+const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded, onLoadingChange }: MarketResearchProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const setIsLoadingWithCallback = (v: boolean) => { setIsLoading(v); onLoadingChange?.(v); };
   const [cachedResult, setCachedResult] = useState<MarketIntelData | null>(cachedData ?? null);
   const [agentStreams, setAgentStreams] = useState<AgentStreamEntry[]>([]);
   const [expandedPanels, setExpandedPanels] = useState<Set<number>>(new Set());
@@ -489,7 +494,7 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
     abortControllerRef.current?.abort();
     runIdsRef.current = [];
     jobIdRef.current = null;
-    setIsLoading(false);
+    setIsLoadingWithCallback(false);
     setAgentStreams(prev => prev.map(s =>
       s.status === 'pending' || s.status === 'running'
         ? { ...s, status: 'cancelled', streamingUrl: null }
@@ -506,7 +511,7 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
   const handleFetch = async () => {
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    setIsLoading(true);
+    setIsLoadingWithCallback(true);
     setCachedResult(null);
     setExpandedPanels(new Set());
     const count = Math.min(Math.max(1, agentCount), peerBanks.length);
@@ -575,12 +580,20 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
     } finally {
       runIdsRef.current = [];
       jobIdRef.current = null;
-      setIsLoading(false);
+      setIsLoadingWithCallback(false);
     }
   };
 
   const showAgentView = agentStreams.length > 0;
   const doneCount = agentStreams.filter(s => s.status === 'done').length;
+  const allCancelledOrError = agentStreams.length > 0 && !isLoading && agentStreams.every(s => s.status === 'cancelled' || s.status === 'error');
+
+  const handleRestart = () => {
+    setAgentStreams([]);
+    setExpandedPanels(new Set());
+    runIdsRef.current = [];
+    jobIdRef.current = null;
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -591,18 +604,39 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
             <h3 className="font-display text-lg text-foreground">Market Research</h3>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span>Agents:</span>
-              <input
-                type="number"
-                min={1}
-                max={peerBanks.length}
-                value={agentCount}
-                onChange={e => setAgentCount(Math.min(Math.max(1, parseInt(e.target.value) || 1), peerBanks.length))}
-                disabled={isLoading}
-                className="w-12 text-center text-xs font-medium border rounded-md px-1 py-0.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-              />
-              <span className="text-muted-foreground/60">/ {peerBanks.length}</span>
+            <div className="flex items-center gap-1.5 border border-black rounded-lg px-2.5 py-1 bg-background">
+              <span className="text-xs font-medium text-muted-foreground">Agents:</span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={agentCount === 0 ? '' : agentCount}
+                  onKeyDown={e => {
+                    if (e.key === 'Backspace') { e.preventDefault(); setAgentCount(0); return; }
+                    const n = parseInt(e.key);
+                    if (!isNaN(n) && n >= 1 && n <= peerBanks.length) { e.preventDefault(); setAgentCount(n); }
+                    else if (isNaN(n) && e.key.length === 1) e.preventDefault();
+                  }}
+                  onBlur={() => { if (agentCount === 0) setAgentCount(1); }}
+                  disabled={isLoading}
+                  readOnly
+                  className="w-5 text-center text-sm font-bold border-0 bg-transparent text-foreground focus:outline-none disabled:opacity-50 caret-transparent"
+                />
+                <div className="flex flex-col gap-px">
+                  <button
+                    onClick={() => setAgentCount(c => Math.min(peerBanks.length, c + 1))}
+                    disabled={isLoading || agentCount >= peerBanks.length}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-30 leading-none"
+                  ><ChevronUp className="h-3 w-3" /></button>
+                  <button
+                    onClick={() => setAgentCount(c => Math.max(1, c - 1))}
+                    disabled={isLoading || agentCount <= 1}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-30 leading-none"
+                  ><ChevronDown className="h-3 w-3" /></button>
+                </div>
+              </div>
+              <span className="text-xs text-muted-foreground/60">/ {peerBanks.length}</span>
             </div>
             <TinyFishBadge />
           </div>
@@ -669,6 +703,12 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
                   <button onClick={handleCancelAll} className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md border border-red-300 text-red-500 hover:bg-red-50 transition-colors">
                     <XCircle className="h-3.5 w-3.5" />
                     Cancel all
+                  </button>
+                )}
+                {allCancelledOrError && (
+                  <button onClick={handleRestart} className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md border border-primary text-primary hover:bg-primary/10 transition-colors">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Run again
                   </button>
                 )}
               </div>
