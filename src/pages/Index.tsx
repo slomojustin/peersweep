@@ -224,7 +224,7 @@ const Index = () => {
                 load 6 test banks
               </button>
               <button
-                onClick={() => setBypassPeerMin(b => !b)}
+                onClick={() => { setBypassPeerMin(b => !b); setPeerBanks([]); }}
                 className="text-xs text-muted-foreground underline hover:text-foreground transition-colors"
               >
                 {bypassPeerMin ? "re-enable min" : "bypass for testing"}

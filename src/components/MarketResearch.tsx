@@ -13,6 +13,7 @@ import { Globe, ExternalLink, Loader2, Landmark, Newspaper, Share2, ChevronDown,
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { fetchMarketIntel, type MarketIntelData, type AgentStreamInfo } from "@/lib/api/marketIntel";
+import { cancelAgentRuns } from "@/lib/api/cancelMarketIntel";
 import type { BankInfo } from "@/data/bankData";
 
 interface MarketResearchProps {
@@ -118,8 +119,10 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
   const [streamingUrl, setStreamingUrl] = useState<string | null>(null);
   const [agentStreams, setAgentStreams] = useState<(AgentStreamInfo & { cancelled?: boolean })[]>([]);
   const [expandedPanels, setExpandedPanels] = useState<Set<number>>(new Set());
+  const [testMode, setTestMode] = useState(false);
   const { toast } = useToast();
   const abortControllerRef = useRef<AbortController | null>(null);
+  const runIdsRef = useRef<string[]>([]);
 
   const togglePanel = (i: number) =>
     setExpandedPanels(prev => {
@@ -132,7 +135,9 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
   const collapseAll = () => setExpandedPanels(new Set());
 
   const handleCancelAll = () => {
+    cancelAgentRuns(runIdsRef.current);
     abortControllerRef.current?.abort();
+    runIdsRef.current = [];
     setIsLoading(false);
     setAgentStreams([]);
     setStreamingUrl(null);
@@ -151,13 +156,16 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
     setStreamingUrl(null);
     setExpandedPanels(new Set());
     // Initialise one panel per peer bank so they're visible from the start (all Pending)
-    setAgentStreams(peerBanks.map(p => ({ bankName: p.name, streamingUrl: null })));
+    const activePeers = testMode ? peerBanks.slice(0, 1) : peerBanks;
+    setAgentStreams(activePeers.map(p => ({ bankName: p.name, streamingUrl: null })));
     try {
       const result = await fetchMarketIntel(
         bank,
-        peerBanks,
+        activePeers,
         (url) => setStreamingUrl(url),
         (streams) => setAgentStreams(streams),
+        controller.signal,
+        (ids) => { runIdsRef.current = ids; },
       );
       setData(result);
       onDataLoaded?.(result);
@@ -166,6 +174,7 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
       console.error("Market intel error:", err);
       toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to fetch market intel", variant: "destructive" });
     } finally {
+      runIdsRef.current = [];
       setIsLoading(false);
       setStreamingUrl(null);
       setAgentStreams([]);
@@ -180,7 +189,19 @@ const MarketResearch = ({ bank, peerBanks, cachedData, onDataLoaded }: MarketRes
             <Globe className="h-5 w-5 text-primary" />
             <h3 className="font-display text-lg text-foreground">Market Research</h3>
           </div>
-          <TinyFishBadge />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setTestMode(m => !m)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title={testMode ? "Test mode: 1 agent only" : "Run all agents"}
+            >
+              <span>1-agent test</span>
+              <div className={`relative w-7 h-4 rounded-full transition-colors duration-200 ${testMode ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
+                <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${testMode ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+              </div>
+            </button>
+            <TinyFishBadge />
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">Competitive intelligence for {bank.name}</p>
       </div>
